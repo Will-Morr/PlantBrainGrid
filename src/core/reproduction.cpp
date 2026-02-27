@@ -159,17 +159,15 @@ std::vector<uint8_t> ReproductionSystem::recombine_genomes(
 void ReproductionSystem::apply_mutations(
     std::vector<uint8_t>& genome,
     float mutation_rate,
-    uint8_t mutation_magnitude,
+    uint8_t /*mutation_magnitude*/,
     std::mt19937_64& rng)
 {
     std::uniform_real_distribution<float> prob(0.0f, 1.0f);
-    std::uniform_int_distribution<int> delta(-mutation_magnitude, mutation_magnitude);
+    std::uniform_int_distribution<int> byte_dist(0, 255);
 
     for (auto& byte : genome) {
         if (prob(rng) < mutation_rate) {
-            int new_val = static_cast<int>(byte) + delta(rng);
-            new_val = std::clamp(new_val, 0, 255);
-            byte = static_cast<uint8_t>(new_val);
+            byte = static_cast<uint8_t>(byte_dist(rng));
         }
     }
 }

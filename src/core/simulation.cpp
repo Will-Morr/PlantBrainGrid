@@ -281,6 +281,9 @@ TickStats Simulation::advance_tick() {
     remove_dead_plants();
     stats.plants_died = plants_before - plants_.size();
 
+    // 10. Auto-spawn if enabled and population is low
+    check_auto_spawn();
+
     // Update stats
     stats.plant_count = plants_.size();
     stats.seed_count = seeds_.size();
@@ -293,6 +296,59 @@ TickStats Simulation::advance_tick() {
 void Simulation::run(uint64_t num_ticks) {
     for (uint64_t i = 0; i < num_ticks; ++i) {
         advance_tick();
+    }
+}
+
+void Simulation::enable_auto_spawn(bool enable, size_t min_population,
+                                    float energy, float water, float nutrients)
+{
+    auto_spawn_enabled_ = enable;
+    auto_spawn_min_population_ = min_population;
+    auto_spawn_energy_ = energy;
+    auto_spawn_water_ = water;
+    auto_spawn_nutrients_ = nutrients;
+}
+
+Plant* Simulation::spawn_random_plant() {
+    const auto& cfg = get_config();
+    std::uniform_int_distribution<int> x_dist(0, static_cast<int>(world_.width()) - 1);
+    std::uniform_int_distribution<int> y_dist(0, static_cast<int>(world_.height()) - 1);
+    std::uniform_int_distribution<int> byte_dist(0, 255);
+
+    for (int attempt = 0; attempt < 100; ++attempt) {
+        GridCoord pos{x_dist(world_.rng()), y_dist(world_.rng())};
+
+        if (!world_.in_bounds(pos)) continue;
+        if (world_.cell_at(pos).is_occupied()) continue;
+        if (world_.cell_at(pos).is_on_fire()) continue;
+
+        std::vector<uint8_t> genome(cfg.brain_size);
+        for (auto& b : genome) {
+            b = static_cast<uint8_t>(byte_dist(world_.rng()));
+        }
+
+        Plant* plant = add_plant(pos, genome);
+        if (plant) {
+            plant->resources().energy = auto_spawn_energy_;
+            plant->resources().water = auto_spawn_water_;
+            plant->resources().nutrients = auto_spawn_nutrients_;
+            return plant;
+        }
+    }
+    return nullptr;
+}
+
+void Simulation::check_auto_spawn() {
+    if (!auto_spawn_enabled_) return;
+
+    size_t living = 0;
+    for (const auto& plant : plants_) {
+        if (plant.is_alive()) ++living;
+    }
+
+    while (living < auto_spawn_min_population_) {
+        if (!spawn_random_plant()) break;
+        ++living;
     }
 }
 

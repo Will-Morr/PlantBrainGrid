@@ -57,6 +57,13 @@ public:
     // Run multiple ticks
     void run(uint64_t num_ticks);
 
+    // Auto-spawn: place plants with randomized brains when population falls below threshold
+    void enable_auto_spawn(bool enable, size_t min_population = 10,
+                           float energy = 100.0f, float water = 50.0f,
+                           float nutrients = 30.0f);
+    bool auto_spawn_enabled() const { return auto_spawn_enabled_; }
+    size_t auto_spawn_min_population() const { return auto_spawn_min_population_; }
+
     // Event callbacks
     void on_plant_death(PlantCallback callback) { on_plant_death_ = callback; }
     void on_plant_birth(PlantCallback callback) { on_plant_birth_ = callback; }
@@ -78,6 +85,13 @@ private:
     PlantCallback on_plant_birth_;
     SeedCallback on_seed_launch_;
 
+    // Auto-spawn state
+    bool auto_spawn_enabled_ = false;
+    size_t auto_spawn_min_population_ = 10;
+    float auto_spawn_energy_ = 100.0f;
+    float auto_spawn_water_ = 50.0f;
+    float auto_spawn_nutrients_ = 30.0f;
+
     // Process brain actions for all plants
     // Returns map of position -> list of (plant_id, action)
     std::unordered_map<GridCoord, std::vector<std::pair<uint64_t, QueuedAction>>>
@@ -95,6 +109,12 @@ private:
 
     // Process fire damage to plant cells
     void process_fire_damage();
+
+    // Spawn a plant with a randomized genome at a random empty position
+    Plant* spawn_random_plant();
+
+    // Check if auto-spawn should fire and do so
+    void check_auto_spawn();
 };
 
 }  // namespace pbg

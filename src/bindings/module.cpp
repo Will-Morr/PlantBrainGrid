@@ -219,6 +219,14 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def("run", &Simulation::run)
         .def("save_state", &Simulation::save_state)
         .def("load_state", &Simulation::load_state)
+        .def("enable_auto_spawn", &Simulation::enable_auto_spawn,
+             py::arg("enable"),
+             py::arg("min_population") = 10,
+             py::arg("energy") = 100.0f,
+             py::arg("water") = 50.0f,
+             py::arg("nutrients") = 30.0f)
+        .def_property_readonly("auto_spawn_enabled", &Simulation::auto_spawn_enabled)
+        .def_property_readonly("auto_spawn_min_population", &Simulation::auto_spawn_min_population)
         .def("on_plant_death", [](Simulation& sim, py::function callback) {
             sim.on_plant_death([callback](const Plant& p) {
                 callback(&p);
