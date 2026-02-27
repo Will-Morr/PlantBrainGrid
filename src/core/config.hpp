@@ -9,7 +9,7 @@ struct Config {
     uint32_t world_width = 512;
     uint32_t world_height = 512;
     float water_perlin_scale = 0.08f;
-    float nutrient_perlin_scale = 0.10f;
+    float nutrient_perlin_scale = 0.03f;
     float water_base = 50.0f;
     float water_amplitude = 40.0f;
     float nutrient_base = 30.0f;
@@ -48,7 +48,7 @@ struct Config {
     float primary_maintenance_energy = 0.1f;
     float small_leaf_maintenance_water = 0.2f;
     float big_leaf_maintenance_water = 1.0f;
-    float big_leaf_maintenance_nutrients = 0.5f;
+    float big_leaf_maintenance_nutrients = 0.3f;
     float root_maintenance_energy = 0.1f;
     float xylem_maintenance_energy = 0.05f;
     float thorn_maintenance_energy = 0.1f;

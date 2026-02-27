@@ -236,20 +236,20 @@ TEST_CASE("World fire system", "[world]") {
         REQUIRE(world.cell_at(left).is_on_fire());
     }
 
-    SECTION("fire does not spread to empty (unoccupied) neighbors") {
+    SECTION("fire spreads to empty (unoccupied) neighbors") {
         GridCoord center{10, 10};
         GridCoord right{11, 10};
 
-        // No occupant on neighbor — fire must not spread there
+        // Fire spreads to any non-wet tile, occupied or not
         world.cell_at(center).water_level = 0.0f;
         world.cell_at(right).water_level = 0.0f;
 
         world.ignite(center);
 
-        for (uint16_t i = 0; i < cfg.fire_spread_ticks + 2; ++i) {
+        for (uint16_t i = 0; i < cfg.fire_spread_ticks; ++i) {
             world.update_fire();
         }
-        REQUIRE_FALSE(world.cell_at(right).is_on_fire());
+        REQUIRE(world.cell_at(right).is_on_fire());
     }
 
     SECTION("fire does not spread to fireproof neighbors") {

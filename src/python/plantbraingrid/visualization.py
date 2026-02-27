@@ -233,8 +233,32 @@ class Visualizer:
 
     def _draw_plant_info(self, plant):
         """Draw info panel for selected plant."""
-        panel_width = 200
-        panel_height = 150
+        try:
+            from _plantbraingrid import CellType
+        except ImportError:
+            return
+
+        # Count each cell type
+        type_counts = {}
+        for cell in plant.cells():
+            t = cell.type
+            type_counts[t] = type_counts.get(t, 0) + 1
+
+        cell_type_names = [
+            (CellType.Primary,       "Primary",        (180, 100, 40)),
+            (CellType.SmallLeaf,     "SmallLeaf",      (34, 139, 34)),
+            (CellType.BigLeaf,       "BigLeaf",        (0, 100, 0)),
+            (CellType.Root,          "Root",           (139, 90, 43)),
+            (CellType.Xylem,         "Xylem",          (210, 180, 140)),
+            (CellType.FireproofXylem,"FproofXylem",    (255, 215, 0)),
+            (CellType.Thorn,         "Thorn",          (128, 128, 128)),
+            (CellType.FireStarter,   "FireStarter",    (255, 69, 0)),
+        ]
+        present = [(name, color, type_counts[ct]) for ct, name, color in cell_type_names if ct in type_counts]
+
+        panel_width = 220
+        # Header (id, age, cells, resources) + one row per present cell type
+        panel_height = 5 + 20 + 18 * 4 + 8 + 16 * len(present) + 8
         panel_x = self.width - panel_width - 10
         panel_y = 35
 
@@ -246,16 +270,22 @@ class Visualizer:
         y = panel_y + 5
         rl.draw_text(f"Plant #{plant.id()}", panel_x + 5, y, 16, rl.Color(255, 255, 255, 255))
         y += 20
-        rl.draw_text(f"Age: {plant.age()}", panel_x + 5, y, 14, rl.Color(200, 200, 200, 255))
-        y += 18
-        rl.draw_text(f"Cells: {plant.cell_count()}", panel_x + 5, y, 14, rl.Color(200, 200, 200, 255))
+        rl.draw_text(f"Age: {plant.age()}  Cells: {plant.cell_count()}", panel_x + 5, y, 14, rl.Color(200, 200, 200, 255))
         y += 18
         res = plant.resources()
-        rl.draw_text(f"Energy: {res.energy:.1f}", panel_x + 5, y, 14, rl.Color(255, 255, 100, 255))
+        rl.draw_text(f"Energy:    {res.energy:.1f}", panel_x + 5, y, 14, rl.Color(255, 255, 100, 255))
         y += 18
-        rl.draw_text(f"Water: {res.water:.1f}", panel_x + 5, y, 14, rl.Color(100, 150, 255, 255))
+        rl.draw_text(f"Water:     {res.water:.1f}", panel_x + 5, y, 14, rl.Color(100, 150, 255, 255))
         y += 18
         rl.draw_text(f"Nutrients: {res.nutrients:.1f}", panel_x + 5, y, 14, rl.Color(139, 100, 80, 255))
+        y += 22
+
+        rl.draw_text("Cell types:", panel_x + 5, y, 13, rl.Color(180, 180, 180, 255))
+        y += 16
+        for name, color, count in present:
+            rl.draw_text(f"  {name}: {count}", panel_x + 5, y, 13,
+                        rl.Color(color[0], color[1], color[2], 255))
+            y += 16
 
     def select_plant_at(self, screen_x: int, screen_y: int, plants) -> Optional[int]:
         """Select plant at screen position."""

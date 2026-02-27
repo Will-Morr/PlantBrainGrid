@@ -157,10 +157,10 @@ void World::update_fire() {
         for (const auto& off : offsets) {
             GridCoord neighbor = src + off;
             if (in_bounds(neighbor)) {
+                // Fire spreads to any non-wet tile; fireproof cells block it
                 const PlantCell* occ = cell_at(neighbor).occupant;
-                if (occ != nullptr && !occ->is_fireproof()) {
-                    ignite(neighbor);
-                }
+                if (occ != nullptr && occ->is_fireproof()) continue;
+                ignite(neighbor);
             }
         }
     }

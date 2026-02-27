@@ -43,13 +43,15 @@ main:
     ; Roots first: even a newly germinated child (31 energy) can place
     ;   Root(8) + Root(8) + Leaf(10) = 26, leaving 5 energy in reserve.
     PLACE_CELL Root,      +0, +1, North   ; root below primary
+    PLACE_CELL Root,      -1, +0, North   ; root below primary
+    PLACE_CELL Root,      +1, +0, North   ; root below primary
     ; PLACE_CELL Root,      +1, +1, North   ; root diagonal — taps a different world cell
-    PLACE_CELL SmallLeaf, +0, -1, North   ; leaf above
-    PLACE_CELL SmallLeaf, +0, -2, North   ; leaf above
-    PLACE_CELL SmallLeaf, +0, -3, North   ; leaf above
-    PLACE_CELL SmallLeaf, +0, -4, North   ; leaf above
-    PLACE_CELL SmallLeaf, +0, -5, North   ; leaf above
-    PLACE_CELL SmallLeaf, +0, -6, North   ; leaf above
+    PLACE_CELL BigLeaf, +0, -1, North   ; leaf above
+    ; PLACE_CELL SmallLeaf, +0, -2, North   ; leaf above
+    ; PLACE_CELL SmallLeaf, +0, -3, North   ; leaf above
+    ; PLACE_CELL SmallLeaf, +0, -4, North   ; leaf above
+    ; PLACE_CELL SmallLeaf, +0, -5, North   ; leaf above
+    ; PLACE_CELL SmallLeaf, +0, -6, North   ; leaf above
     ; PLACE_CELL SmallLeaf, +1,  0, East    ; leaf right
     ; PLACE_CELL SmallLeaf, -1,  0, West    ; leaf left
 
@@ -58,12 +60,12 @@ main:
     ; 240 bytes ≈ 94 units, safely above the 91-unit total seed+launch cost.
     ; CMP_LT sets THRESH = 1 when 240 < ENERGY (i.e. we are above threshold).
     ; JUMP_IF_ZERO skips LAUNCH_SEED when THRESH = 0 (below threshold).
-    SENSE_SELF_ENERGY [ENERGY]
+    SENSE_SELF_NUTRIENTS [ENERGY]
     LOAD_IMM  [THRESH], 240
     CMP_LT    [THRESH], [THRESH], [ENERGY]   ; THRESH = (240 < energy_byte)
     JUMP_IF_ZERO [THRESH], done              ; skip if energy ≤ 240 bytes
 
-    LAUNCH_SEED Alternating, 80, 50, 20, 60, +0, +0, random
+    LAUNCH_SEED Alternating, 100, 100, 1000, 50, +0, +0, random
 
 done:
     HALT

@@ -90,53 +90,55 @@ bool Plant::is_blocked_by_thorn(const GridCoord& pos, const World& world, uint64
     return false;
 }
 
-bool Plant::can_place_cell(CellType type, const GridCoord& pos, const World& world) const {
+bool Plant::place_cell_shape_ok(CellType type, const GridCoord& pos, const World& world) const {
     if (!alive_) return false;
     if (!is_valid_placeable_cell(type)) return false;
     if (!world.in_bounds(pos)) return false;
-
-    // Check if position is already occupied
     if (world.cell_at(pos).is_occupied()) return false;
-
-    // Must be adjacent to existing plant cell
     if (!is_adjacent_to_plant(pos)) return false;
-
-    // Check for blocking thorns from other plants
     if (is_blocked_by_thorn(pos, world, id_)) return false;
-
-    // Check if we can afford it
-    PlacementCost cost = get_placement_cost(type);
-    if (!cost.can_afford(resources_.energy, resources_.water, resources_.nutrients)) {
-        return false;
-    }
-
     return true;
 }
 
-bool Plant::place_cell(CellType type, const GridCoord& pos, Direction dir, World& world) {
-    if (!can_place_cell(type, pos, world)) return false;
-
-    // Pay the cost
-    PlacementCost cost = get_placement_cost(type);
-    if (!pay_cost(cost)) return false;
-
-    // Create and add the cell
+void Plant::do_place_cell_internal(CellType type, const GridCoord& pos, Direction dir, World& world) {
     PlantCell cell(type, pos, dir);
     cell.plant_id = id_;
     add_cell_internal(cell);
-
-    // Update world grid
     world.cell_at(pos).occupant = &cells_.back();
 
-    // Special handling for FireStarter - ignite adjacent tiles
     if (type == CellType::FireStarter) {
         static const GridCoord offsets[] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
         for (const auto& offset : offsets) {
             world.ignite(pos + offset);
         }
     }
+}
 
+bool Plant::can_place_cell(CellType type, const GridCoord& pos, const World& world) const {
+    if (!place_cell_shape_ok(type, pos, world)) return false;
+    PlacementCost cost = get_placement_cost(type);
+    return cost.can_afford(resources_.energy, resources_.water, resources_.nutrients);
+}
+
+bool Plant::place_cell(CellType type, const GridCoord& pos, Direction dir, World& world) {
+    if (!can_place_cell(type, pos, world)) return false;
+    PlacementCost cost = get_placement_cost(type);
+    if (!pay_cost(cost)) return false;
+    do_place_cell_internal(type, pos, dir, world);
     return true;
+}
+
+bool Plant::place_cell_free(CellType type, const GridCoord& pos, Direction dir, World& world) {
+    if (!place_cell_shape_ok(type, pos, world)) return false;
+    do_place_cell_internal(type, pos, dir, world);
+    return true;
+}
+
+void Plant::force_deduct_placement_cost(CellType type) {
+    PlacementCost cost = get_placement_cost(type);
+    resources_.energy -= cost.energy;
+    resources_.water -= cost.water;
+    resources_.nutrients -= cost.nutrients;
 }
 
 bool Plant::remove_cell(const GridCoord& pos, World& world) {

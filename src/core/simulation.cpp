@@ -3,6 +3,7 @@
 #include "core/config.hpp"
 #include <algorithm>
 #include <fstream>
+#include <unordered_set>
 
 namespace pbg {
 
@@ -179,6 +180,16 @@ TickStats Simulation::apply_actions(
         }
         if (multi_plant) {
             stats.placements_cancelled += action_list.size();
+            // Charge each unique plant for wasting resources on a conflicting action
+            std::unordered_set<uint64_t> charged;
+            for (auto& [pid, act] : action_list) {
+                if (act.type == ActionType::PlaceCell && charged.insert(pid).second) {
+                    Plant* p = find_plant(pid);
+                    if (p && p->is_alive()) {
+                        p->force_deduct_placement_cost(act.cell_type);
+                    }
+                }
+            }
             continue;
         }
 
@@ -187,7 +198,9 @@ TickStats Simulation::apply_actions(
         if (!plant || !plant->is_alive()) continue;
 
         if (action.type == ActionType::PlaceCell) {
-            if (plant->place_cell(action.cell_type, action.position, action.direction, world_)) {
+            // Always charge the cost; use place_cell_free since cost is pre-paid
+            plant->force_deduct_placement_cost(action.cell_type);
+            if (plant->place_cell_free(action.cell_type, action.position, action.direction, world_)) {
                 ++stats.cells_placed;
             }
         } else if (action.type == ActionType::RemoveCell) {
