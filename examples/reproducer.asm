@@ -4,7 +4,7 @@
 ;   1. Attempt to grow a compact body each tick: 2 roots + 3 small leaves.
 ;      Roots are placed first so the plant builds water income before energy income.
 ;      Placements that are already occupied or unaffordable fail silently.
-;   2. Clone once energy exceeds the threshold (MotherOnly = asexual).
+;   2. Clone once energy exceeds the threshold (Alternating = get random mix of genes from another plant).
 ;   3. HALT at the end of each tick — brain runs exactly once per tick,
 ;      avoiding the instruction-limit penalty entirely.
 ;
@@ -17,7 +17,7 @@
 ;   Water  outgo:   3 leaves × 0.2 = 0.6 / tick
 ;   Net water:      +2.4 / tick
 ;
-; Reproduction (LAUNCH_SEED MotherOnly, 80, 50, 20, 60, +0, +0, random):
+; Reproduction (LAUNCH_SEED Alternating, 80, 50, 20, 60, +0, +0, random):
 ;   Seed energy:    80 / 2.55 ≈ 31 units  — child can place Root(8)+Root(8)+Leaf(10)
 ;   Seed water:     50 / 2.55 ≈ 20 units
 ;   Seed nutrients: 20 / 2.55 ≈  8 units
@@ -58,7 +58,7 @@ main:
     CMP_LT    [THRESH], [THRESH], [ENERGY]   ; THRESH = (240 < energy_byte)
     JUMP_IF_ZERO [THRESH], done              ; skip if energy ≤ 240 bytes
 
-    LAUNCH_SEED MotherOnly, 80, 50, 20, 60, +0, +0, random
+    LAUNCH_SEED Alternating, 80, 50, 20, 60, +0, +0, random
 
 done:
     HALT
