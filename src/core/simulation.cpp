@@ -237,6 +237,9 @@ void Simulation::process_fire_damage() {
         }
 
         for (const auto& pos : cells_to_remove) {
+            // Extinguish fire when it destroys the cell beneath it
+            world_.cell_at(pos).fire_ticks = 0;
+
             // Check if this is the primary cell
             if (pos == plant.primary_position()) {
                 plant.kill();

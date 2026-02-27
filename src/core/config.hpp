@@ -9,7 +9,7 @@ struct Config {
     uint32_t world_width = 512;
     uint32_t world_height = 512;
     float water_perlin_scale = 0.02f;
-    float nutrient_perlin_scale = 0.015f;
+    float nutrient_perlin_scale = 0.15f;
     float water_base = 50.0f;
     float water_amplitude = 40.0f;
     float nutrient_base = 30.0f;
