@@ -157,6 +157,7 @@ bool Brain::execute_instruction(Plant& plant, World& world, std::vector<QueuedAc
 
         case OP_HALT:
             halted_ = true;
+            ip_ += 1; // Increment instuction pointer to not just stop forever
             return false;
 
         case OP_JUMP: {

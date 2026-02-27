@@ -2,6 +2,8 @@
 
 A plant evolution simulation where plants grow on a 2D grid, compete for resources, and evolve through reproduction. Each plant is controlled by a bytecode VM "brain" that encodes its behavior as a genome subject to mutation and recombination.
 
+Fair warning, this is my first real vibe code project (if that isn't obvious from looking at it)
+
 ## Overview
 
 - **World**: 2D grid with water/nutrients (Perlin noise), light levels varying by season, and fire propagation
