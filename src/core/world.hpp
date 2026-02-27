@@ -50,6 +50,7 @@ public:
     // Fire
     void ignite(const GridCoord& coord);
     void update_fire();
+    const std::vector<GridCoord>& burned_out_positions() const { return burned_out_positions_; }
 
     // Simulation tick
     void advance_tick();
@@ -69,6 +70,7 @@ private:
     uint64_t tick_ = 0;
 
     std::vector<WorldCell> cells_;
+    std::vector<GridCoord> burned_out_positions_;
     std::mt19937_64 rng_;
     PerlinNoise water_perlin_;
     PerlinNoise nutrient_perlin_;

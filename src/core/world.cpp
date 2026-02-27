@@ -125,6 +125,8 @@ void World::ignite(const GridCoord& coord) {
 void World::update_fire() {
     const auto& cfg = get_config();
 
+    burned_out_positions_.clear();
+
     // Collect cells that should spread fire this tick
     std::vector<GridCoord> spread_sources;
 
@@ -134,6 +136,11 @@ void World::update_fire() {
 
             if (cell.fire_ticks > 0) {
                 --cell.fire_ticks;
+
+                if (cell.fire_ticks == 0) {
+                    // Fire just burned out — destroy whatever is here
+                    burned_out_positions_.push_back({static_cast<int32_t>(x), static_cast<int32_t>(y)});
+                }
 
                 // Check if this fire should spread
                 uint16_t ticks_burned = cfg.fire_destroy_ticks - cell.fire_ticks;

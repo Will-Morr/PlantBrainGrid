@@ -218,34 +218,21 @@ void Simulation::check_starvation() {
 }
 
 void Simulation::process_fire_damage() {
-    for (auto& plant : plants_) {
-        if (!plant.is_alive()) continue;
+    // Only destroy cells where fire just burned out this tick (fire_ticks hit 0)
+    for (const GridCoord& pos : world_.burned_out_positions()) {
+        const PlantCell* occ = world_.cell_at(pos).occupant;
+        if (!occ || occ->is_fireproof()) continue;
 
-        // Check each cell for fire damage
-        std::vector<GridCoord> cells_to_remove;
+        for (auto& plant : plants_) {
+            if (!plant.is_alive()) continue;
+            if (occ->plant_id != plant.id()) continue;
 
-        for (const auto& cell : plant.cells()) {
-            if (!world_.in_bounds(cell.position)) continue;
-
-            const WorldCell& wc = world_.cell_at(cell.position);
-
-            // Cell is destroyed when fire burns out (fire_ticks reaches 0 from > 0)
-            // For simplicity, destroy cell if tile is on fire and cell isn't fireproof
-            if (wc.is_on_fire() && !cell.is_fireproof()) {
-                cells_to_remove.push_back(cell.position);
-            }
-        }
-
-        for (const auto& pos : cells_to_remove) {
-            // Extinguish fire when it destroys the cell beneath it
-            world_.cell_at(pos).fire_ticks = 0;
-
-            // Check if this is the primary cell
             if (pos == plant.primary_position()) {
                 plant.kill();
-                break;
+            } else {
+                plant.remove_cell(pos, world_);
             }
-            plant.remove_cell(pos, world_);
+            break;
         }
     }
 }
