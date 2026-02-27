@@ -98,10 +98,12 @@ def run_visual(width, height, seed):
     vis = Visualizer(1280, 720, "PlantBrainGrid — single reproducer")
     vis.initialize()
 
-    # Centre view on the starting plant; zoom=1 → 8 px/cell, ~160×90 cells visible
+    # Centre view on the starting plant.
+    # screen = (world - camera) * zoom * cell_size  →  camera = world - screen/(zoom*cell_size)
     vis.camera.zoom = 1.0
-    vis.camera.x = cx - vis.width / (2 * vis.camera.zoom)
-    vis.camera.y = cy - vis.height / (2 * vis.camera.zoom)
+    scale = vis.camera.zoom * vis.camera.cell_size
+    vis.camera.x = cx - vis.width  / (2 * scale)
+    vis.camera.y = cy - vis.height / (2 * scale)
 
     ticks_per_frame = 5
 
@@ -143,8 +145,8 @@ def run_visual(width, height, seed):
 
 def main():
     parser = argparse.ArgumentParser(description="Single-reproducer bootstrap example")
-    parser.add_argument('--width',    type=int, default=256)
-    parser.add_argument('--height',   type=int, default=256)
+    parser.add_argument('--width',    type=int, default=64)
+    parser.add_argument('--height',   type=int, default=64)
     parser.add_argument('--seed',     type=int, default=42)
     parser.add_argument('--ticks',    type=int, default=3000,
                         help='Ticks to run in headless mode (default: 3000)')

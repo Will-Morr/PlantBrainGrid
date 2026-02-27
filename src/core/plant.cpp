@@ -148,9 +148,11 @@ bool Plant::remove_cell(const GridCoord& pos, World& world) {
     PlantCell* cell = find_cell(pos);
     if (!cell) return false;
 
-    // Clear world grid reference
+    // Clear world grid reference and extinguish fire
     if (world.in_bounds(pos)) {
-        world.cell_at(pos).occupant = nullptr;
+        WorldCell& wc = world.cell_at(pos);
+        wc.occupant = nullptr;
+        wc.fire_ticks = 0;
     }
 
     remove_cell_internal(pos);

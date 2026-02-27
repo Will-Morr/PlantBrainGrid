@@ -54,6 +54,7 @@ void Simulation::remove_dead_plants() {
                     WorldCell& wc = world_.cell_at(cell.position);
                     if (wc.occupant && wc.occupant->plant_id == plant.id()) {
                         wc.occupant = nullptr;
+                        wc.fire_ticks = 0;
                     }
                 }
             }

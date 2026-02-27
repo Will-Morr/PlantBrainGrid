@@ -31,22 +31,37 @@ SELECTION_COLOR = (255, 255, 0)
 
 @dataclass
 class Camera:
-    """2D camera for pan/zoom."""
+    """2D camera for pan/zoom.
+
+    World coordinates are integers (grid cells).
+    Screen coordinates are pixels.
+    Relationship:  screen = (world - camera) * zoom * cell_size
+    """
     x: float = 0.0
     y: float = 0.0
     zoom: float = 1.0
+    cell_size: int = 8  # pixels per world cell at zoom=1
 
-    def screen_to_world(self, screen_x: int, screen_y: int) -> Tuple[int, int]:
-        """Convert screen coordinates to world grid coordinates."""
-        world_x = int((screen_x / self.zoom) + self.x)
-        world_y = int((screen_y / self.zoom) + self.y)
+    def world_to_screen(self, world_x: float, world_y: float) -> Tuple[float, float]:
+        """Convert world grid coordinates to screen pixel coordinates."""
+        scale = self.zoom * self.cell_size
+        screen_x = (world_x - self.x) * scale
+        screen_y = (world_y - self.y) * scale
+        return screen_x, screen_y
+
+    def screen_to_world(self, screen_x: float, screen_y: float) -> Tuple[int, int]:
+        """Convert screen pixel coordinates to world grid coordinates (integer)."""
+        scale = self.zoom * self.cell_size
+        world_x = int(screen_x / scale + self.x)
+        world_y = int(screen_y / scale + self.y)
         return world_x, world_y
 
-    def world_to_screen(self, world_x: int, world_y: int) -> Tuple[float, float]:
-        """Convert world grid coordinates to screen coordinates."""
-        screen_x = (world_x - self.x) * self.zoom
-        screen_y = (world_y - self.y) * self.zoom
-        return screen_x, screen_y
+    def screen_to_world_f(self, screen_x: float, screen_y: float) -> Tuple[float, float]:
+        """Convert screen pixel coordinates to world coordinates (float, for zoom pivot)."""
+        scale = self.zoom * self.cell_size
+        world_x = screen_x / scale + self.x
+        world_y = screen_y / scale + self.y
+        return world_x, world_y
 
 
 class Visualizer:
@@ -65,7 +80,6 @@ class Visualizer:
         self.show_nutrients = False
         self.show_fire = True
         self.paused = False
-        self.cell_size = 8
         self._initialized = False
 
     def initialize(self):
@@ -86,10 +100,18 @@ class Visualizer:
         """Check if window should close."""
         return rl.window_should_close()
 
+    def _apply_zoom(self, factor: float, pivot_screen_x: float, pivot_screen_y: float):
+        """Zoom by factor, keeping the world point under pivot_screen fixed."""
+        wx, wy = self.camera.screen_to_world_f(pivot_screen_x, pivot_screen_y)
+        self.camera.zoom = max(0.1, min(20.0, self.camera.zoom * factor))
+        scale = self.camera.zoom * self.camera.cell_size
+        self.camera.x = wx - pivot_screen_x / scale
+        self.camera.y = wy - pivot_screen_y / scale
+
     def handle_input(self):
         """Handle keyboard and mouse input."""
-        # Pan with arrow keys or WASD
-        pan_speed = 10.0 / self.camera.zoom
+        # Pan with arrow keys or WASD (in world-cell units)
+        pan_speed = 5.0 / self.camera.zoom
         if rl.is_key_down(rl.KEY_LEFT) or rl.is_key_down(rl.KEY_A):
             self.camera.x -= pan_speed
         if rl.is_key_down(rl.KEY_RIGHT) or rl.is_key_down(rl.KEY_D):
@@ -99,16 +121,20 @@ class Visualizer:
         if rl.is_key_down(rl.KEY_DOWN) or rl.is_key_down(rl.KEY_S):
             self.camera.y += pan_speed
 
-        # Zoom with mouse wheel or +/-
+        # Mouse-wheel zoom: pivot around the cursor
         wheel = rl.get_mouse_wheel_move()
         if wheel != 0:
-            self.camera.zoom *= 1.1 if wheel > 0 else 0.9
-            self.camera.zoom = max(0.1, min(10.0, self.camera.zoom))
+            factor = 1.1 if wheel > 0 else (1.0 / 1.1)
+            mx = float(rl.get_mouse_x())
+            my = float(rl.get_mouse_y())
+            self._apply_zoom(factor, mx, my)
 
+        # Keyboard zoom: pivot around screen centre
+        center_x, center_y = self.width / 2.0, self.height / 2.0
         if rl.is_key_pressed(rl.KEY_EQUAL) or rl.is_key_pressed(rl.KEY_KP_ADD):
-            self.camera.zoom *= 1.2
+            self._apply_zoom(1.2, center_x, center_y)
         if rl.is_key_pressed(rl.KEY_MINUS) or rl.is_key_pressed(rl.KEY_KP_SUBTRACT):
-            self.camera.zoom /= 1.2
+            self._apply_zoom(1.0 / 1.2, center_x, center_y)
 
         # Toggle overlays
         if rl.is_key_pressed(rl.KEY_ONE):
@@ -131,48 +157,36 @@ class Visualizer:
         rl.begin_drawing()
         rl.clear_background(rl.Color(30, 30, 30, 255))
 
-        # Calculate visible bounds
+        # Cell size in screen pixels at the current zoom level
+        cs = self.camera.cell_size
+        scale = self.camera.zoom * cs
+        cell_px = max(1, int(scale))
+
+        # Visible world-cell range
         start_x = max(0, int(self.camera.x))
         start_y = max(0, int(self.camera.y))
-        end_x = min(world.width(), int(self.camera.x + self.width / self.camera.zoom) + 1)
-        end_y = min(world.height(), int(self.camera.y + self.height / self.camera.zoom) + 1)
-
-        cell_size = int(self.cell_size * self.camera.zoom)
-        if cell_size < 1:
-            cell_size = 1
+        end_x = min(world.width(),  int(self.camera.x + self.width  / scale) + 2)
+        end_y = min(world.height(), int(self.camera.y + self.height / scale) + 2)
 
         # Draw terrain overlays
         for y in range(start_y, end_y):
             for x in range(start_x, end_x):
-                screen_x, screen_y = self.camera.world_to_screen(x, y)
-
+                sx, sy = self.camera.world_to_screen(x, y)
                 cell = world.cell_at(x, y)
 
-                # Water overlay
                 if self.show_water and cell.water_level > 0:
                     alpha = min(200, int(cell.water_level * 2))
-                    rl.draw_rectangle(
-                        int(screen_x), int(screen_y),
-                        cell_size, cell_size,
-                        rl.Color(0, 100, 200, alpha)
-                    )
+                    rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
+                                      rl.Color(0, 100, 200, alpha))
 
-                # Nutrient overlay
                 if self.show_nutrients and cell.nutrient_level > 0:
                     alpha = min(200, int(cell.nutrient_level * 3))
-                    rl.draw_rectangle(
-                        int(screen_x), int(screen_y),
-                        cell_size, cell_size,
-                        rl.Color(139, 69, 19, alpha)
-                    )
+                    rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
+                                      rl.Color(139, 69, 19, alpha))
 
-                # Fire
                 if self.show_fire and cell.is_on_fire():
-                    rl.draw_rectangle(
-                        int(screen_x), int(screen_y),
-                        cell_size, cell_size,
-                        rl.Color(255, 100, 0, 200)
-                    )
+                    rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
+                                      rl.Color(255, 100, 0, 200))
 
         # Draw plant cells
         for plant in plants:
@@ -182,30 +196,18 @@ class Visualizer:
             is_selected = self.selected_plant_id == plant.id()
 
             for cell in plant.cells():
-                screen_x, screen_y = self.camera.world_to_screen(
-                    cell.position.x, cell.position.y
-                )
+                sx, sy = self.camera.world_to_screen(cell.position.x, cell.position.y)
 
-                # Get cell color
                 color = CELL_COLORS.get(int(cell.type), (255, 0, 255))
-
-                # Dim if disabled
                 if not cell.enabled:
                     color = tuple(c // 2 for c in color)
 
-                rl.draw_rectangle(
-                    int(screen_x), int(screen_y),
-                    cell_size, cell_size,
-                    rl.Color(color[0], color[1], color[2], 255)
-                )
+                rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
+                                  rl.Color(color[0], color[1], color[2], 255))
 
-                # Selection highlight
                 if is_selected:
-                    rl.draw_rectangle_lines(
-                        int(screen_x), int(screen_y),
-                        cell_size, cell_size,
-                        rl.Color(255, 255, 0, 255)
-                    )
+                    rl.draw_rectangle_lines(int(sx), int(sy), cell_px, cell_px,
+                                            rl.Color(255, 255, 0, 255))
 
         # Draw UI
         self._draw_ui(world, plants)
@@ -214,9 +216,8 @@ class Visualizer:
 
     def _draw_ui(self, world, plants):
         """Draw UI overlay."""
-        # Status bar
         status = f"Tick: {world.tick()}  Plants: {len(plants)}  "
-        status += f"Zoom: {self.camera.zoom:.1f}  "
+        status += f"Zoom: {self.camera.zoom:.1f}x  "
         if self.paused:
             status += "[PAUSED]  "
         status += "1:Water 2:Nutrients 3:Fire  Space:Pause"
@@ -224,7 +225,6 @@ class Visualizer:
         rl.draw_rectangle(0, 0, self.width, 25, rl.Color(0, 0, 0, 180))
         rl.draw_text(status, 10, 5, 16, rl.Color(255, 255, 255, 255))
 
-        # Selected plant info
         if self.selected_plant_id is not None:
             for plant in plants:
                 if plant.id() == self.selected_plant_id:

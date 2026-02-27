@@ -87,8 +87,9 @@ def run_visual(width: int, height: int, seed: int, auto_spawn: bool = False):
     vis = Visualizer(1280, 720, "PlantBrainGrid")
     vis.initialize()
 
-    vis.camera.x = width / 2 - vis.width / (2 * vis.camera.zoom)
-    vis.camera.y = height / 2 - vis.height / (2 * vis.camera.zoom)
+    scale = vis.camera.zoom * vis.camera.cell_size
+    vis.camera.x = width  / 2 - vis.width  / (2 * scale)
+    vis.camera.y = height / 2 - vis.height / (2 * scale)
 
     ticks_per_frame = 1
 

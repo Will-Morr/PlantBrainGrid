@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include "core/world.hpp"
+#include "core/plant_cell.hpp"
 
 using namespace pbg;
 using Catch::Matchers::WithinAbs;
@@ -205,15 +206,21 @@ TEST_CASE("World fire system", "[world]") {
         REQUIRE(world.cell_at(pos).fire_ticks == initial_ticks - 1);
     }
 
-    SECTION("fire spreads after spread_ticks") {
+    SECTION("fire spreads to occupied neighbors after spread_ticks") {
         GridCoord center{10, 10};
+        GridCoord right{11, 10};
+        GridCoord left{9, 10};
+
+        // Place fake occupants on neighbors so fire can spread there
+        PlantCell dummy_right(CellType::SmallLeaf, right);
+        PlantCell dummy_left(CellType::SmallLeaf, left);
+        world.cell_at(right).occupant = &dummy_right;
+        world.cell_at(left).occupant = &dummy_left;
 
         // Ensure center and neighbors can burn
         world.cell_at(center).water_level = 0.0f;
-        world.cell_at(center.x + 1, center.y).water_level = 0.0f;
-        world.cell_at(center.x - 1, center.y).water_level = 0.0f;
-        world.cell_at(center.x, center.y + 1).water_level = 0.0f;
-        world.cell_at(center.x, center.y - 1).water_level = 0.0f;
+        world.cell_at(right).water_level = 0.0f;
+        world.cell_at(left).water_level = 0.0f;
 
         world.ignite(center);
 
@@ -221,12 +228,46 @@ TEST_CASE("World fire system", "[world]") {
         for (uint16_t i = 0; i < cfg.fire_spread_ticks - 1; ++i) {
             world.update_fire();
         }
-        REQUIRE_FALSE(world.cell_at(center.x + 1, center.y).is_on_fire());
+        REQUIRE_FALSE(world.cell_at(right).is_on_fire());
 
-        // After spread_ticks, neighbors should ignite
+        // After spread_ticks, occupied neighbors should ignite
         world.update_fire();
-        REQUIRE(world.cell_at(center.x + 1, center.y).is_on_fire());
-        REQUIRE(world.cell_at(center.x - 1, center.y).is_on_fire());
+        REQUIRE(world.cell_at(right).is_on_fire());
+        REQUIRE(world.cell_at(left).is_on_fire());
+    }
+
+    SECTION("fire does not spread to empty (unoccupied) neighbors") {
+        GridCoord center{10, 10};
+        GridCoord right{11, 10};
+
+        // No occupant on neighbor — fire must not spread there
+        world.cell_at(center).water_level = 0.0f;
+        world.cell_at(right).water_level = 0.0f;
+
+        world.ignite(center);
+
+        for (uint16_t i = 0; i < cfg.fire_spread_ticks + 2; ++i) {
+            world.update_fire();
+        }
+        REQUIRE_FALSE(world.cell_at(right).is_on_fire());
+    }
+
+    SECTION("fire does not spread to fireproof neighbors") {
+        GridCoord center{10, 10};
+        GridCoord right{11, 10};
+
+        PlantCell fireproof(CellType::FireproofXylem, right);
+        world.cell_at(right).occupant = &fireproof;
+
+        world.cell_at(center).water_level = 0.0f;
+        world.cell_at(right).water_level = 0.0f;
+
+        world.ignite(center);
+
+        for (uint16_t i = 0; i < cfg.fire_spread_ticks + 2; ++i) {
+            world.update_fire();
+        }
+        REQUIRE_FALSE(world.cell_at(right).is_on_fire());
     }
 
     SECTION("fire burns out after destroy_ticks") {

@@ -1,4 +1,5 @@
 #include "core/world.hpp"
+#include "core/plant_cell.hpp"
 #include <cmath>
 #include <stdexcept>
 
@@ -149,7 +150,10 @@ void World::update_fire() {
         for (const auto& off : offsets) {
             GridCoord neighbor = src + off;
             if (in_bounds(neighbor)) {
-                ignite(neighbor);
+                const PlantCell* occ = cell_at(neighbor).occupant;
+                if (occ != nullptr && !occ->is_fireproof()) {
+                    ignite(neighbor);
+                }
             }
         }
     }

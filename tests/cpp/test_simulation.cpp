@@ -234,6 +234,55 @@ TEST_CASE("Fire damage to plants", "[simulation]") {
         REQUIRE(sim.plants().empty());
     }
 
+    SECTION("Fire extinguishes when cell is removed") {
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 1000.0f;
+        plant->resources().water = 1000.0f;
+
+        plant->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim.world());
+
+        sim.world().cell_at(51, 50).water_level = 0.0f;
+        sim.world().ignite({51, 50});
+        REQUIRE(sim.world().cell_at(51, 50).is_on_fire());
+
+        plant->remove_cell({51, 50}, sim.world());
+
+        REQUIRE_FALSE(sim.world().cell_at(51, 50).is_on_fire());
+    }
+
+    SECTION("Fire extinguishes when plant dies") {
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 1000.0f;
+        plant->resources().water = 1000.0f;
+
+        sim.world().cell_at(50, 50).water_level = 0.0f;
+        sim.world().ignite({50, 50});
+        REQUIRE(sim.world().cell_at(50, 50).is_on_fire());
+
+        plant->kill();
+        sim.remove_dead_plants();
+
+        REQUIRE_FALSE(sim.world().cell_at(50, 50).is_on_fire());
+    }
+
+    SECTION("Fire does not spread to fireproof cells") {
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 1000.0f;
+        plant->resources().water = 1000.0f;
+
+        plant->place_cell(CellType::FireproofXylem, {51, 50}, Direction::North, sim.world());
+
+        sim.world().cell_at(50, 50).water_level = 0.0f;
+        sim.world().cell_at(51, 50).water_level = 0.0f;
+        sim.world().ignite({50, 50});
+
+        for (uint16_t i = 0; i < cfg.fire_destroy_ticks + 2; ++i) {
+            sim.world().update_fire();
+        }
+
+        REQUIRE_FALSE(sim.world().cell_at(51, 50).is_on_fire());
+    }
+
     cfg.fire_destroy_ticks = orig_destroy;
 }
 
