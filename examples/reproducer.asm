@@ -1,50 +1,64 @@
 ; Reproducer
 ;
-; Strategy: grow quickly, then reproduce asexually once energy is high.
-; Uses LAUNCH_SEED with MotherOnly recombination to clone itself.
+; Corrected strategy:
+;   1. Attempt to grow a compact body each tick: 2 roots + 3 small leaves.
+;      Roots are placed first so the plant builds water income before energy income.
+;      Placements that are already occupied or unaffordable fail silently.
+;   2. Clone once energy exceeds the threshold (MotherOnly = asexual).
+;   3. HALT at the end of each tick — brain runs exactly once per tick,
+;      avoiding the instruction-limit penalty entirely.
+;
+; Resource budget (fully grown, 3 SmallLeafs + 2 Roots):
+;   Energy income:  3 × 1.0 = 3.0 / tick  (× light multiplier ≈ 0.9 avg)
+;   Energy outgo:   primary 0.1 + 2 roots × 0.1 = 0.3 / tick
+;   Net energy:     +2.7 / tick
+;
+;   Water  income:  2 roots × 1.5 = 3.0 / tick (while local world cells hold water)
+;   Water  outgo:   3 leaves × 0.2 = 0.6 / tick
+;   Net water:      +2.4 / tick
+;
+; Reproduction (LAUNCH_SEED MotherOnly, 80, 50, 20, 60, +0, +0, random):
+;   Seed energy:    80 / 2.55 ≈ 31 units  — child can place Root(8)+Root(8)+Leaf(10)
+;   Seed water:     50 / 2.55 ≈ 20 units
+;   Seed nutrients: 20 / 2.55 ≈  8 units
+;   Launch power:   60 units (not scaled); max scatter radius = 60 × 2 = 120 cells
+;                   (large radius colonises fresh world cells well away from the parent)
+;   Total cost to mother: 31 + 60 = 91 energy, 20 water
+;
+; Threshold: 240 bytes ≈ 94 energy units
+;   After launch:  94 − 91 = ~3 units remaining → earns back at +2.7/tick
+;   At full growth: reproduces every ~33 ticks
 ;
 ; Memory layout:
-;   0x00D0 = energy
-;   0x00D1 = cell count
-;   0x00D2 = threshold
-;   0x00D3 = launch direction x
-;   0x00D4 = launch direction y
+;   0x00D0 = ENERGY   (sensed energy, 0–255)
+;   0x00D1 = THRESH   (comparison scratch, 0 or 1)
 
 .define ENERGY  0x00D0
-.define COUNT   0x00D1
-.define THRESH  0x00D2
+.define THRESH  0x00D1
 
 main:
+    ; --- Growth phase ---
+    ; Try to place all body cells.  Already-placed cells are skipped silently.
+    ; Cells the plant cannot yet afford are also skipped silently.
+    ; Roots first: even a newly germinated child (31 energy) can place
+    ;   Root(8) + Root(8) + Leaf(10) = 26, leaving 5 energy in reserve.
+    PLACE_CELL Root,      +0, +1, North   ; root below primary
+    PLACE_CELL Root,      +1, +1, North   ; root diagonal — taps a different world cell
+    PLACE_CELL SmallLeaf, +0, -1, North   ; leaf above
+    PLACE_CELL SmallLeaf, +1,  0, East    ; leaf right
+    PLACE_CELL SmallLeaf, -1,  0, West    ; leaf left
+
+    ; --- Reproduction check ---
+    ; SENSE_SELF_ENERGY fills ENERGY with energy * 2.55, capped at 255.
+    ; 240 bytes ≈ 94 units, safely above the 91-unit total seed+launch cost.
+    ; CMP_LT sets THRESH = 1 when 240 < ENERGY (i.e. we are above threshold).
+    ; JUMP_IF_ZERO skips LAUNCH_SEED when THRESH = 0 (below threshold).
     SENSE_SELF_ENERGY [ENERGY]
-    SENSE_CELL_COUNT  [COUNT]
+    LOAD_IMM  [THRESH], 240
+    CMP_LT    [THRESH], [THRESH], [ENERGY]   ; THRESH = (240 < energy_byte)
+    JUMP_IF_ZERO [THRESH], done              ; skip if energy ≤ 240 bytes
 
-    ; Growth phase: build up cells while energy < 200
-    LOAD_IMM [THRESH], 200
-    CMP_LT [THRESH], [ENERGY], [THRESH]    ; THRESH = (energy < 200)
-    JUMP_IF_NEQ [THRESH], 1, grow_phase
+    LAUNCH_SEED MotherOnly, 80, 50, 20, 60, +0, +0, random
 
-    ; Reproduction phase: energy >= 200 — launch a seed
-    JUMP reproduce
-
-grow_phase:
-    ; Only grow if we have at least some energy
-    LOAD_IMM [THRESH], 30
-    CMP_LT [THRESH], [THRESH], [ENERGY]
-    JUMP_IF_ZERO [THRESH], main
-
-    ; Build a compact body: leaves + xylem for resource flow
-    PLACE_CELL SmallLeaf, +0, -1, North
-    PLACE_CELL SmallLeaf, +1, +0, East
-    PLACE_CELL BigLeaf,   -1, +0, West
-    PLACE_CELL Root,      +0, +1, North
-    PLACE_CELL Xylem,     +0, -2, South
-
-    JUMP main
-
-reproduce:
-    ; Launch seed: clone (MotherOnly), give it 60 energy, 30 water, 15 nutrients
-    ; Power=80, aim slightly northeast, exact placement
-    LAUNCH_SEED MotherOnly, 60, 30, 15, 80, +5, -5, random
-
-    ; Cool down — wait for energy to recover
-    JUMP main
+done:
+    HALT

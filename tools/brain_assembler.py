@@ -403,9 +403,9 @@ class BrainAssembler:
             elif fmt_type == "placement":
                 larg = arg.strip().lower()
                 if larg == "exact":
-                    self._emit(1)
+                    self._emit(0)   # SeedPlacementMode::Exact = 0
                 elif larg == "random":
-                    self._emit(0)
+                    self._emit(1)   # SeedPlacementMode::Random = 1
                 else:
                     self._emit(self._parse_int(arg, "placement") & 1)
 

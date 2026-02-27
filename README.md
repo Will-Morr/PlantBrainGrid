@@ -101,7 +101,7 @@ python -m plantbraingrid --auto-spawn --seed 42
 
 ```bash
 cd build
-ctest --output-on-failure         # Run all 58 tests
+ctest --output-on-failure         # Run all tests
 ./plantbraingrid_tests "[brain]"  # Brain VM tests only
 ./plantbraingrid_tests "[world]"  # World grid tests only
 ./plantbraingrid_tests "[plant]"  # Plant tests only
@@ -170,6 +170,103 @@ Output includes:
 - Loop detection (backward jumps)
 - Complexity score (0–100)
 
+## Loading Plants into the Simulation
+
+Plants can be loaded from hand-written assembly, saved genomes, or generated randomly. All three approaches use the same `Simulation.add_plant` entry point.
+
+### From an assembled brain
+
+Assemble a `.asm` file to a binary genome, then load it:
+
+```python
+from _plantbraingrid import Simulation, GridCoord
+import sys
+sys.path.insert(0, 'tools')
+from brain_assembler import BrainAssembler
+
+genome = list(BrainAssembler().assemble(open('examples/reproducer.asm').read()))
+
+sim = Simulation(256, 256, 42)
+plant = sim.add_plant(GridCoord(128, 128), genome)
+plant.resources().energy = 200.0
+plant.resources().water = 100.0
+plant.resources().nutrients = 50.0
+```
+
+Or load a pre-assembled `.bin` file:
+
+```python
+genome = list(open('my_genome.bin', 'rb').read())
+plant = sim.add_plant(GridCoord(64, 64), genome)
+```
+
+### Placing multiple plants at once
+
+```python
+import random
+
+rng = random.Random(42)
+positions = [(rng.randint(10, 246), rng.randint(10, 246)) for _ in range(20)]
+
+for x, y in positions:
+    plant = sim.add_plant(GridCoord(x, y), genome)
+    if plant:  # None if position was occupied or out of bounds
+        plant.resources().energy = 150.0
+        plant.resources().water = 75.0
+        plant.resources().nutrients = 40.0
+```
+
+### Competing species
+
+Load different genomes to pit strategies against each other:
+
+```python
+assembler = BrainAssembler()
+genome_a = list(assembler.assemble(open('examples/reproducer.asm').read()))
+genome_b = list(assembler.assemble(open('examples/fire_starter.asm').read()))
+
+sim = Simulation(512, 512, 1337)
+
+for i in range(10):
+    p = sim.add_plant(GridCoord(50 + i * 5, 256), genome_a)
+    if p:
+        p.resources().energy = 150.0; p.resources().water = 75.0
+
+for i in range(10):
+    p = sim.add_plant(GridCoord(400 + i * 5, 256), genome_b)
+    if p:
+        p.resources().energy = 150.0; p.resources().water = 75.0
+```
+
+### From a saved simulation
+
+Plants are serialised as part of the simulation state and restore automatically:
+
+```python
+sim = Simulation(256, 256, 42)
+sim.load_state('checkpoint.bin')
+# Plants, resources, tick count, and RNG state are all restored
+sim.run(1000)
+```
+
+### Auto-spawn (no manual placement needed)
+
+Enable auto-spawn to let the simulation seed itself with random-brain plants whenever the population falls below a threshold. Plants die when energy or water reaches 0, so auto-spawn ensures the world never stays empty:
+
+```python
+sim = Simulation(256, 256, 42)
+sim.enable_auto_spawn(True, min_population=10, energy=100.0, water=50.0, nutrients=30.0)
+sim.run(5000)
+```
+
+### Plant death
+
+Plants die when:
+- Their **primary cell** is destroyed (by fire or another plant)
+- Their **energy** or **water** reaches 0 after a resource tick
+
+Nutrients reaching 0 does not cause death. Make sure newly placed plants have enough energy and water to survive their first few ticks before their leaves and roots begin producing.
+
 ## Simulation Loop
 
 Each tick proceeds in order:
@@ -178,12 +275,13 @@ Each tick proceeds in order:
 2. Fire damage — burn non-fireproof cells on burning tiles
 3. Death check — kill plants whose primary cell is gone
 4. Resource processing — leaves generate energy, roots extract water/nutrients, xylem transfers resources
-5. Brain execution — all brains run in parallel (action queues built independently)
-6. Action resolution — conflicting placements from different plants cancel out
-7. Seed flight update
-8. Seed germination
-9. Dead plant removal
-10. Auto-spawn (if enabled) — inject random plants if population < threshold
+5. Starvation check — kill plants whose energy or water reached 0
+6. Brain execution — all brains run in parallel (action queues built independently)
+7. Action resolution — conflicting placements from different plants cancel out
+8. Seed flight update
+9. Seed germination
+10. Dead plant removal
+11. Auto-spawn (if enabled) — inject random plants if population < threshold
 
 ## Architecture
 
@@ -209,8 +307,8 @@ tools/
   brain_assembler.py   .asm → bytecode
   genome_analyzer.py   Genome statistics
 
-tests/cpp/          Catch2 unit tests (58 tests)
-tests/python/       pytest tests (66 tests)
+tests/cpp/          Catch2 unit tests
+tests/python/       pytest tests
 examples/           Example .asm brain programs
 ```
 

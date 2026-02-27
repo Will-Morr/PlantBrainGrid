@@ -168,9 +168,15 @@ TickStats Simulation::apply_actions(
     stats.tick = tick_;
 
     for (auto& [pos, action_list] : actions) {
-        if (action_list.size() > 1) {
-            // Conflict! Multiple plants trying to act on same position
-            // All placements cancelled
+        // A conflict only occurs when two *different* plants queue an action
+        // for the same position in the same tick. If the same plant's brain
+        // loops and re-queues the same position, just use the first entry.
+        uint64_t first_id = action_list[0].first;
+        bool multi_plant = false;
+        for (size_t i = 1; i < action_list.size(); ++i) {
+            if (action_list[i].first != first_id) { multi_plant = true; break; }
+        }
+        if (multi_plant) {
             stats.placements_cancelled += action_list.size();
             continue;
         }
