@@ -110,6 +110,9 @@ private:
     // Process fire damage to plant cells
     void process_fire_damage();
 
+    // Kill plants that have run out of energy or water
+    void check_starvation();
+
     // Spawn a plant with a randomized genome at a random empty position
     Plant* spawn_random_plant();
 

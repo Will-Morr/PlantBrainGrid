@@ -201,6 +201,15 @@ void Simulation::process_resources() {
     }
 }
 
+void Simulation::check_starvation() {
+    for (auto& plant : plants_) {
+        if (!plant.is_alive()) continue;
+        if (plant.resources().energy <= 0.0f || plant.resources().water <= 0.0f) {
+            plant.kill();
+        }
+    }
+}
+
 void Simulation::process_fire_damage() {
     for (auto& plant : plants_) {
         if (!plant.is_alive()) continue;
@@ -259,24 +268,27 @@ TickStats Simulation::advance_tick() {
     // 4. Process resources for all plants
     process_resources();
 
-    // 5. Execute all brains and collect actions
+    // 5. Kill plants that have exhausted energy or water
+    check_starvation();
+
+    // 6. Execute all brains and collect actions
     auto actions = collect_all_actions();
 
-    // 6. Apply non-conflicting actions
+    // 7. Apply non-conflicting actions
     TickStats action_stats = apply_actions(actions);
     stats.cells_placed = action_stats.cells_placed;
     stats.cells_removed = action_stats.cells_removed;
     stats.placements_cancelled = action_stats.placements_cancelled;
 
-    // 7. Update seeds in flight
+    // 8. Update seeds in flight
     update_seeds();
 
-    // 8. Germinate landed seeds
+    // 9. Germinate landed seeds
     size_t seeds_before = seeds_.size();
     germinate_seeds();
     stats.seeds_germinated = seeds_before - seeds_.size();
 
-    // 9. Remove dead plants
+    // 10. Remove dead plants
     size_t plants_before = plants_.size();
     remove_dead_plants();
     stats.plants_died = plants_before - plants_.size();

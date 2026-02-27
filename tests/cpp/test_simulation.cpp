@@ -80,7 +80,9 @@ TEST_CASE("Simulation tick", "[simulation]") {
     }
 
     SECTION("Tick returns stats") {
-        sim.add_plant({50, 50}, genome);
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 100.0f;
+        plant->resources().water = 100.0f;
 
         TickStats stats = sim.advance_tick();
 
@@ -196,6 +198,7 @@ TEST_CASE("Fire damage to plants", "[simulation]") {
     SECTION("Fire destroys plant cells") {
         Plant* plant = sim.add_plant({50, 50}, genome);
         plant->resources().energy = 1000.0f;
+        plant->resources().water = 1000.0f;
 
         // Add a leaf
         plant->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim.world());
@@ -216,6 +219,8 @@ TEST_CASE("Fire damage to plants", "[simulation]") {
 
     SECTION("Fire on primary cell kills plant") {
         Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 1000.0f;
+        plant->resources().water = 1000.0f;
 
         sim.world().cell_at(50, 50).water_level = 0.0f;
         sim.world().ignite({50, 50});
@@ -278,6 +283,60 @@ TEST_CASE("Event callbacks", "[simulation]") {
         sim.remove_dead_plants();
 
         REQUIRE(deaths == 1);
+    }
+}
+
+TEST_CASE("Starvation death", "[simulation]") {
+    std::vector<uint8_t> genome(100, 0);
+
+    SECTION("Plant with zero energy dies after tick") {
+        Simulation sim(100, 100, 42);
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 0.0f;
+        plant->resources().water = 100.0f;
+
+        sim.advance_tick();
+
+        REQUIRE(sim.plants().empty());
+    }
+
+    SECTION("Plant with zero water dies after tick") {
+        Simulation sim(100, 100, 42);
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 100.0f;
+        plant->resources().water = 0.0f;
+
+        sim.advance_tick();
+
+        REQUIRE(sim.plants().empty());
+    }
+
+    SECTION("Plant with zero nutrients survives") {
+        Simulation sim(100, 100, 42);
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 100.0f;
+        plant->resources().water = 100.0f;
+        plant->resources().nutrients = 0.0f;
+
+        sim.advance_tick();
+
+        // Nutrients alone don't cause death
+        REQUIRE_FALSE(sim.plants().empty());
+    }
+
+    SECTION("Plant drains to zero over time and dies") {
+        Simulation sim(100, 100, 42);
+        // Give minimal resources and no leaves/roots — maintenance will drain them
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 1.0f;
+        plant->resources().water = 1000.0f;
+
+        bool died = false;
+        for (int i = 0; i < 100; ++i) {
+            sim.advance_tick();
+            if (sim.plants().empty()) { died = true; break; }
+        }
+        REQUIRE(died);
     }
 }
 

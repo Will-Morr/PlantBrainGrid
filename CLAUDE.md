@@ -59,7 +59,7 @@ Brain execution: `opcode = memory[ip] % NUM_OPCODES`, then execute with args fro
 
 1. **Determinism**: All randomness uses seeded RNG; same seed = identical simulation
 2. **Xylem flow**: Automatic each tick when enabled, costs resources per hop
-3. **Plant death**: Only when primary cell destroyed (never from resource depletion or brain errors)
+3. **Plant death**: When primary cell is destroyed, or when energy or water reaches 0 after a resource tick. Nutrients at 0 do not cause death. Brain errors never cause death.
 4. **Mate selection**: Brain iteratively adds weighted criteria (variable length), then selects best match
 5. **Parallel brain execution**: All brains run in parallel, building action queues. Conflicting placements cancel out.
 6. **Non-fatal errors**: Out-of-bounds memory and instruction limits incur resource penalties, not death
