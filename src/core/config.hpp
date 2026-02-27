@@ -60,12 +60,12 @@ struct Config {
     float seed_launch_distance_per_energy = 2.0f;
 
     // Fire
-    uint16_t fire_spread_ticks = 5;
-    uint16_t fire_destroy_ticks = 10;
+    uint16_t fire_spread_ticks = 10;
+    uint16_t fire_destroy_ticks = 50;
     float fire_water_threshold = 99999.0f;
 
     // Seasons
-    uint32_t season_length = 10000;
+    uint32_t season_length = 1000;
     float base_light = 0.5f;
     float light_amplitude = 0.4f;
 
