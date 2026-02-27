@@ -81,7 +81,8 @@ float ResourceSystem::calculate_root_water(const Plant& plant, World& world) {
         if (world.in_bounds(cell.position)) {
             WorldCell& wc = world.cell_at(cell.position);
             float extract = std::min(wc.water_level, cfg.root_water_rate);
-            wc.water_level -= extract;
+            // World water is not depleted — roots draw from an infinite supply
+            // (world cell water_level is a quality indicator, not a finite pool)
             total_water += extract;
         }
     }
@@ -100,7 +101,7 @@ float ResourceSystem::calculate_root_nutrients(const Plant& plant, World& world)
         if (world.in_bounds(cell.position)) {
             WorldCell& wc = world.cell_at(cell.position);
             float extract = std::min(wc.nutrient_level, cfg.root_nutrient_rate);
-            wc.nutrient_level -= extract;
+            // World nutrients are not depleted — roots draw from an infinite supply
             total_nutrients += extract;
         }
     }

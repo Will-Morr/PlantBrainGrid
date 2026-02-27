@@ -95,7 +95,8 @@ TEST_CASE("Root water extraction", "[resources]") {
 
         REQUIRE(extracted > 0.0f);
         REQUIRE(extracted <= cfg.root_water_rate);
-        REQUIRE(world.cell_at(root_pos).water_level < initial_water);
+        // World water is infinite — cell level is not depleted
+        REQUIRE(world.cell_at(root_pos).water_level == initial_water);
     }
 
     SECTION("Root extracts limited by available water") {
@@ -111,8 +112,10 @@ TEST_CASE("Root water extraction", "[resources]") {
 
         float extracted = ResourceSystem::calculate_root_water(plant, world);
 
+        // Extraction is capped by the cell's water level
         REQUIRE_THAT(extracted, WithinAbs(scarce_water, 0.01f));
-        REQUIRE_THAT(world.cell_at(root_pos).water_level, WithinAbs(0.0f, 0.01f));
+        // Cell level is not depleted (infinite supply)
+        REQUIRE_THAT(world.cell_at(root_pos).water_level, WithinAbs(scarce_water, 0.01f));
     }
 
     SECTION("Disabled roots don't extract water") {
@@ -153,7 +156,8 @@ TEST_CASE("Root nutrient extraction", "[resources]") {
 
         REQUIRE(extracted > 0.0f);
         REQUIRE(extracted <= cfg.root_nutrient_rate);
-        REQUIRE(world.cell_at(root_pos).nutrient_level < initial_nutrients);
+        // World nutrients are infinite — cell level is not depleted
+        REQUIRE(world.cell_at(root_pos).nutrient_level == initial_nutrients);
     }
 }
 

@@ -79,6 +79,8 @@ std::vector<QueuedAction> Brain::execute_tick(Plant& plant, World& world) {
     const auto& cfg = get_config();
     std::vector<QueuedAction> actions;
 
+    ip_ = 0;
+    call_stack_.clear();
     halted_ = false;
     oob_count_ = 0;
 
