@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "pybind11>=2.11"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plantbraingrid"
+version = "0.1.0"
+description = "Plant evolution simulation with bytecode brains"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "raylib>=5.0",
+    "numpy>=1.21",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+plantbraingrid = "plantbraingrid.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src/python"]

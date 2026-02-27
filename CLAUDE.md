@@ -11,28 +11,27 @@ PlantBrainGrid is a plant evolution simulation where plants grow on a 2D grid, c
 ## Build and Run Commands
 
 ```bash
-# Build C++ core
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+# Build C++ core (without Python bindings)
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_PYTHON_BINDINGS=OFF
 make -j$(nproc)
 
-# Install Python package (development mode)
-pip install -e .
+# Run all C++ tests
+ctest --output-on-failure
 
-# Run C++ tests
-cd build && ctest --output-on-failure
+# Run specific test category
+./plantbraingrid_tests "[brain]"
+./plantbraingrid_tests "[world]"
+./plantbraingrid_tests "[plant]"
+./plantbraingrid_tests "[perlin]"
 
-# Run Python tests
+# Build with Python bindings (requires python3-dev)
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON_BINDINGS=ON
+make -j$(nproc)
+pip install -e ..
+
+# Run Python tests (when bindings available)
 pytest tests/python/ -v
-
-# Run single C++ test file
-cd build && ./tests/test_brain
-
-# Run single Python test
-pytest tests/python/test_bindings.py -v
-
-# Run simulation
-python -m plantbraingrid
 ```
 
 ## Architecture
@@ -73,4 +72,17 @@ Each component should have unit tests before integration. Use Catch2 for C++, py
 
 ## Implementation Status
 
-See `IMPLEMENTATION_PLAN.md` for current progress and phase breakdown.
+**Completed (Phase 1-3):**
+- Core types, config, Perlin noise
+- World grid with terrain, seasons, fire
+- Plant with cells, resources, placement rules
+- Brain VM with all instruction categories
+- 26 unit tests passing
+
+**Next Steps (Phase 4+):**
+- Resource flow system
+- Reproduction and seeds
+- Simulation loop with parallel brain execution
+- Python bindings and visualization
+
+See `IMPLEMENTATION_PLAN.md` for full phase breakdown.
