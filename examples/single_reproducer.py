@@ -44,7 +44,7 @@ def _build_sim(width, height, seed):
 
     plant.resources().energy    = 200.0
     plant.resources().water     = 100.0
-    plant.resources().nutrients = 50.0
+    plant.resources().nutrients = 100.0
 
     return sim, genome_path, len(genome)
 
@@ -105,9 +105,9 @@ def run_visual(width, height, seed):
     vis.camera.x = cx - vis.width  / (2 * scale)
     vis.camera.y = cy - vis.height / (2 * scale)
 
-    ticks_per_frame = 5
+    ticks_per_frame = 1
 
-    report_every = 50
+    report_every = 1
     tick = -1
 
     while not vis.should_close():

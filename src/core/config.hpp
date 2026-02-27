@@ -66,8 +66,8 @@ struct Config {
 
     // Seasons
     uint32_t season_length = 1000;
-    float base_light = 0.5f;
-    float light_amplitude = 0.4f;
+    float base_light = 1.0f;
+    float light_amplitude = 0.0f;
 
     // Scaling for brain sensing (convert float resources to 0-255 byte)
     float resource_sense_scale = 2.55f;  // 100 resource = 255 byte value

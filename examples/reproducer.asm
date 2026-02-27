@@ -46,7 +46,7 @@ main:
     ; Sense current cell count. If == 4 (primary + root + 2 leaves), skip growth.
     ; This prevents paying placement cost for already-occupied positions.
     SENSE_CELL_COUNT [TMP]
-    LOAD_IMM  [THRESH], 4
+    LOAD_IMM  [THRESH], 5
     CMP_EQ    [GROWN], [TMP], [THRESH]
     JUMP_IF_NEQ [GROWN], 0, reproduce
 
@@ -54,6 +54,7 @@ main:
     PLACE_CELL Root,      +0, +1, North
     PLACE_CELL SmallLeaf, +0, -1, North
     PLACE_CELL SmallLeaf, +1,  0, North
+    PLACE_CELL SmallLeaf, -1,  0, North
 
 reproduce:
     ; --- Reproduction check ---
@@ -66,7 +67,7 @@ reproduce:
     CMP_LT    [THRESH], [THRESH], [ENERGY]
     JUMP_IF_ZERO [THRESH], done
 
-    LAUNCH_SEED Alternating, 80, 50, 20, 50, +0, +0, random
+    LAUNCH_SEED Alternating, 150, 150, 120, 50, +0, +0, random
 
 done:
     HALT
