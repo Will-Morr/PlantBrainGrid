@@ -170,7 +170,7 @@ TEST_CASE("Maintenance costs", "[resources]") {
 
         Resources maintenance = ResourceSystem::calculate_maintenance(plant);
 
-        REQUIRE(maintenance.energy >= cfg.primary_maintenance_energy);
+        REQUIRE(maintenance.energy >= cfg.primary_costs.maintain_energy);
     }
 
     SECTION("Leaves have water maintenance cost") {
@@ -182,7 +182,7 @@ TEST_CASE("Maintenance costs", "[resources]") {
 
         Resources maintenance = ResourceSystem::calculate_maintenance(plant);
 
-        REQUIRE(maintenance.water >= cfg.small_leaf_maintenance_water);
+        REQUIRE(maintenance.water >= cfg.small_leaf_costs.maintain_water);
     }
 
     SECTION("Big leaves cost more to maintain") {

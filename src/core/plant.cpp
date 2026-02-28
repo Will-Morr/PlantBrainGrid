@@ -118,13 +118,15 @@ void Plant::do_place_cell_internal(CellType type, const GridCoord& pos, Directio
 
 bool Plant::can_place_cell(CellType type, const GridCoord& pos, const World& world) const {
     if (!place_cell_shape_ok(type, pos, world)) return false;
-    PlacementCost cost = get_placement_cost(type);
-    return cost.can_afford(resources_.energy, resources_.water, resources_.nutrients);
+    const CellCosts& cost = get_cell_costs(type);
+    return resources_.energy >= cost.build_energy &&
+           resources_.water >= cost.build_water &&
+           resources_.nutrients >= cost.build_nutrients;
 }
 
 bool Plant::place_cell(CellType type, const GridCoord& pos, Direction dir, World& world) {
     if (!can_place_cell(type, pos, world)) return false;
-    PlacementCost cost = get_placement_cost(type);
+    const CellCosts& cost = get_cell_costs(type);
     if (!pay_cost(cost)) return false;
     do_place_cell_internal(type, pos, dir, world);
     return true;
@@ -137,10 +139,10 @@ bool Plant::place_cell_free(CellType type, const GridCoord& pos, Direction dir, 
 }
 
 void Plant::force_deduct_placement_cost(CellType type) {
-    PlacementCost cost = get_placement_cost(type);
-    resources_.energy -= cost.energy;
-    resources_.water -= cost.water;
-    resources_.nutrients -= cost.nutrients;
+    const CellCosts& cost = get_cell_costs(type);
+    resources_.energy -= cost.build_energy;
+    resources_.water -= cost.build_water;
+    resources_.nutrients -= cost.build_nutrients;
 }
 
 bool Plant::remove_cell(const GridCoord& pos, World& world) {
@@ -194,8 +196,8 @@ void Plant::kill() {
     alive_ = false;
 }
 
-bool Plant::pay_cost(const PlacementCost& cost) {
-    return pay_cost(cost.energy, cost.water, cost.nutrients);
+bool Plant::pay_cost(const CellCosts& cost) {
+    return pay_cost(cost.build_energy, cost.build_water, cost.build_nutrients);
 }
 
 bool Plant::pay_cost(float energy, float water, float nutrients) {

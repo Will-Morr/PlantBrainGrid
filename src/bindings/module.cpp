@@ -56,6 +56,16 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .value("RandomMix", RecombinationMethod::RandomMix)
         .value("Alternating", RecombinationMethod::Alternating);
 
+    // CellCosts
+    py::class_<CellCosts>(m, "CellCosts")
+        .def(py::init<>())
+        .def_readwrite("build_energy", &CellCosts::build_energy)
+        .def_readwrite("build_water", &CellCosts::build_water)
+        .def_readwrite("build_nutrients", &CellCosts::build_nutrients)
+        .def_readwrite("maintain_energy", &CellCosts::maintain_energy)
+        .def_readwrite("maintain_water", &CellCosts::maintain_water)
+        .def_readwrite("maintain_nutrients", &CellCosts::maintain_nutrients);
+
     // Config
     py::class_<Config>(m, "Config")
         .def(py::init<>())
@@ -72,7 +82,15 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def_readwrite("season_length", &Config::season_length)
         .def_readwrite("xylem_transfer_cost", &Config::xylem_transfer_cost)
         .def_readwrite("fire_spread_ticks", &Config::fire_spread_ticks)
-        .def_readwrite("fire_destroy_ticks", &Config::fire_destroy_ticks);
+        .def_readwrite("fire_destroy_ticks", &Config::fire_destroy_ticks)
+        .def_readwrite("primary_costs", &Config::primary_costs)
+        .def_readwrite("small_leaf_costs", &Config::small_leaf_costs)
+        .def_readwrite("big_leaf_costs", &Config::big_leaf_costs)
+        .def_readwrite("root_costs", &Config::root_costs)
+        .def_readwrite("xylem_costs", &Config::xylem_costs)
+        .def_readwrite("fireproof_xylem_costs", &Config::fireproof_xylem_costs)
+        .def_readwrite("thorn_costs", &Config::thorn_costs)
+        .def_readwrite("fire_starter_costs", &Config::fire_starter_costs);
 
     m.def("get_config", &get_config, py::return_value_policy::reference);
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/types.hpp"
+#include "core/config.hpp"
 #include <cstdint>
 
 namespace pbg {
@@ -33,26 +34,7 @@ struct PlantCell {
     }
 };
 
-// Cell placement cost calculation
-struct PlacementCost {
-    float energy = 0.0f;
-    float water = 0.0f;
-    float nutrients = 0.0f;
-
-    bool can_afford(float e, float w, float n) const {
-        return e >= energy && w >= water && n >= nutrients;
-    }
-};
-
-PlacementCost get_placement_cost(CellType type);
-
-// Cell maintenance cost (per tick)
-struct MaintenanceCost {
-    float energy = 0.0f;
-    float water = 0.0f;
-    float nutrients = 0.0f;
-};
-
-MaintenanceCost get_maintenance_cost(CellType type);
+// Returns build and maintenance costs for a given cell type
+const CellCosts& get_cell_costs(CellType type);
 
 }  // namespace pbg

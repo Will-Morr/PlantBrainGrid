@@ -102,7 +102,7 @@ public:
     void advance_age() { ++age_; }
 
     // Pay resource cost
-    bool pay_cost(const PlacementCost& cost);
+    bool pay_cost(const CellCosts& cost);
     bool pay_cost(float energy, float water, float nutrients);
 
 private:

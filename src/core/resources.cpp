@@ -110,15 +110,14 @@ float ResourceSystem::calculate_root_nutrients(const Plant& plant, World& world)
 }
 
 Resources ResourceSystem::calculate_maintenance(const Plant& plant) {
-    const auto& cfg = get_config();
     Resources total;
 
     for (const auto& cell : plant.cells()) {
         // All cells pay maintenance, even if disabled
-        MaintenanceCost cost = get_maintenance_cost(cell.type);
-        total.energy += cost.energy;
-        total.water += cost.water;
-        total.nutrients += cost.nutrients;
+        const CellCosts& cost = get_cell_costs(cell.type);
+        total.energy += cost.maintain_energy;
+        total.water += cost.maintain_water;
+        total.nutrients += cost.maintain_nutrients;
     }
 
     return total;
