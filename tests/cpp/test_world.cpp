@@ -1,7 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include "core/world.hpp"
-#include "core/plant_cell.hpp"
 
 using namespace pbg;
 using Catch::Matchers::WithinAbs;
@@ -24,7 +23,7 @@ TEST_CASE("World construction", "[world]") {
                 REQUIRE(cell.nutrient_level >= 0.0f);
                 REQUIRE(cell.light_level > 0.0f);
                 REQUIRE(cell.fire_ticks == 0);
-                REQUIRE(cell.occupant == nullptr);
+                REQUIRE_FALSE(cell.is_occupied());
             }
         }
     }
@@ -180,6 +179,8 @@ TEST_CASE("World fire system", "[world]") {
     SECTION("ignite starts fire") {
         GridCoord pos{10, 10};
         world.cell_at(pos).water_level = 0.0f;  // Ensure it can ignite
+        world.cell_at(pos).plant_id = 1;
+        world.cell_at(pos).cell_type = CellType::SmallLeaf;
 
         REQUIRE_FALSE(world.cell_at(pos).is_on_fire());
         world.ignite(pos);
@@ -190,6 +191,8 @@ TEST_CASE("World fire system", "[world]") {
     SECTION("wet cells don't ignite") {
         GridCoord pos{10, 10};
         world.cell_at(pos).water_level = 150.0f;  // Above threshold
+        world.cell_at(pos).plant_id = 1;
+        world.cell_at(pos).cell_type = CellType::SmallLeaf;
 
         world.ignite(pos);
         REQUIRE_FALSE(world.cell_at(pos).is_on_fire());
@@ -198,6 +201,8 @@ TEST_CASE("World fire system", "[world]") {
     SECTION("fire decrements each tick") {
         GridCoord pos{10, 10};
         world.cell_at(pos).water_level = 0.0f;
+        world.cell_at(pos).plant_id = 1;
+        world.cell_at(pos).cell_type = CellType::SmallLeaf;
         world.ignite(pos);
 
         uint16_t initial_ticks = world.cell_at(pos).fire_ticks;
@@ -211,11 +216,10 @@ TEST_CASE("World fire system", "[world]") {
         GridCoord right{11, 10};
         GridCoord left{9, 10};
 
-        // Place fake occupants on neighbors so fire can spread there
-        PlantCell dummy_right(CellType::SmallLeaf, right);
-        PlantCell dummy_left(CellType::SmallLeaf, left);
-        world.cell_at(right).occupant = &dummy_right;
-        world.cell_at(left).occupant = &dummy_left;
+        // Place fake occupants on center and neighbors so fire can spread there
+        world.cell_at(center).plant_id = 1; world.cell_at(center).cell_type = CellType::SmallLeaf;
+        world.cell_at(right).plant_id = 1;  world.cell_at(right).cell_type = CellType::SmallLeaf;
+        world.cell_at(left).plant_id = 1;   world.cell_at(left).cell_type = CellType::SmallLeaf;
 
         // Ensure center and neighbors can burn
         world.cell_at(center).water_level = 0.0f;
@@ -236,28 +240,30 @@ TEST_CASE("World fire system", "[world]") {
         REQUIRE(world.cell_at(left).is_on_fire());
     }
 
-    SECTION("fire spreads to empty (unoccupied) neighbors") {
+    SECTION("fire does not spread to empty (unoccupied) neighbors") {
         GridCoord center{10, 10};
         GridCoord right{11, 10};
 
-        // Fire spreads to any non-wet tile, occupied or not
+        // center has an occupant so it can ignite; right is empty
+        world.cell_at(center).plant_id = 1;
+        world.cell_at(center).cell_type = CellType::SmallLeaf;
         world.cell_at(center).water_level = 0.0f;
         world.cell_at(right).water_level = 0.0f;
 
         world.ignite(center);
 
-        for (uint16_t i = 0; i < cfg.fire_spread_ticks; ++i) {
+        for (uint16_t i = 0; i < cfg.fire_spread_ticks + 2; ++i) {
             world.update_fire();
         }
-        REQUIRE(world.cell_at(right).is_on_fire());
+        REQUIRE_FALSE(world.cell_at(right).is_on_fire());
     }
 
     SECTION("fire does not spread to fireproof neighbors") {
         GridCoord center{10, 10};
         GridCoord right{11, 10};
 
-        PlantCell fireproof(CellType::FireproofXylem, right);
-        world.cell_at(right).occupant = &fireproof;
+        world.cell_at(center).plant_id = 1; world.cell_at(center).cell_type = CellType::SmallLeaf;
+        world.cell_at(right).plant_id = 1;  world.cell_at(right).cell_type = CellType::FireproofXylem;
 
         world.cell_at(center).water_level = 0.0f;
         world.cell_at(right).water_level = 0.0f;
@@ -273,12 +279,8 @@ TEST_CASE("World fire system", "[world]") {
     SECTION("fire burns out after destroy_ticks") {
         GridCoord pos{10, 10};
         world.cell_at(pos).water_level = 0.0f;
-
-        // Set adjacent cells to high water to prevent re-ignition from spread
-        world.cell_at(pos.x + 1, pos.y).water_level = 1000.0f;
-        world.cell_at(pos.x - 1, pos.y).water_level = 1000.0f;
-        world.cell_at(pos.x, pos.y + 1).water_level = 1000.0f;
-        world.cell_at(pos.x, pos.y - 1).water_level = 1000.0f;
+        world.cell_at(pos).plant_id = 1;
+        world.cell_at(pos).cell_type = CellType::SmallLeaf;
 
         world.ignite(pos);
 

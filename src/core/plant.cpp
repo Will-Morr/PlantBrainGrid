@@ -82,8 +82,8 @@ bool Plant::is_blocked_by_thorn(const GridCoord& pos, const World& world, uint64
         if (!world.in_bounds(neighbor)) continue;
 
         const WorldCell& wc = world.cell_at(neighbor);
-        if (wc.occupant && wc.occupant->plant_id != self_id &&
-            wc.occupant->blocks_placement()) {
+        if (wc.is_occupied() && wc.plant_id != self_id &&
+            wc.blocks_placement()) {
             return true;
         }
     }
@@ -104,7 +104,9 @@ void Plant::do_place_cell_internal(CellType type, const GridCoord& pos, Directio
     PlantCell cell(type, pos, dir);
     cell.plant_id = id_;
     add_cell_internal(cell);
-    world.cell_at(pos).occupant = &cells_.back();
+    WorldCell& placed_wc = world.cell_at(pos);
+    placed_wc.plant_id = id_;
+    placed_wc.cell_type = type;
 
     if (type == CellType::FireStarter) {
         static const GridCoord offsets[] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
@@ -153,7 +155,7 @@ bool Plant::remove_cell(const GridCoord& pos, World& world) {
     // Clear world grid reference and extinguish fire
     if (world.in_bounds(pos)) {
         WorldCell& wc = world.cell_at(pos);
-        wc.occupant = nullptr;
+        wc.plant_id = 0;
         wc.fire_ticks = 0;
     }
 

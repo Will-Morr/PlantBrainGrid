@@ -80,7 +80,8 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def_readwrite("nutrient_level", &WorldCell::nutrient_level)
         .def_readwrite("light_level", &WorldCell::light_level)
         .def_readonly("fire_ticks", &WorldCell::fire_ticks)
-        .def_readwrite("occupant", &WorldCell::occupant)
+        .def_readonly("plant_id", &WorldCell::plant_id)
+        .def_readonly("cell_type", &WorldCell::cell_type)
         .def("is_on_fire", &WorldCell::is_on_fire)
         .def("is_occupied", &WorldCell::is_occupied);
 

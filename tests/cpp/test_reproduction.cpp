@@ -216,8 +216,8 @@ TEST_CASE("Seed germination", "[reproduction]") {
         // Create occupying plant
         std::vector<uint8_t> genome(100, 0);
         Plant blocker(1, {50, 50}, genome);
-        world.cell_at(50, 50).occupant =
-            const_cast<PlantCell*>(blocker.find_cell({50, 50}));
+        world.cell_at(50, 50).plant_id = blocker.id();
+        world.cell_at(50, 50).cell_type = CellType::Primary;
 
         Seed seed;
         seed.genome = std::vector<uint8_t>(100, 0);
@@ -241,8 +241,15 @@ TEST_CASE("Seed germination", "[reproduction]") {
     }
 
     SECTION("Seed fails to germinate on fire") {
+        // Set up an occupied cell so it can be ignited
+        world.cell_at(50, 50).plant_id = 1;
+        world.cell_at(50, 50).cell_type = CellType::SmallLeaf;
         world.cell_at(50, 50).water_level = 0.0f;
         world.ignite({50, 50});
+
+        // Remove the occupant so the seed could theoretically germinate
+        // (simulating the plant having been burned away but fire still active)
+        world.cell_at(50, 50).plant_id = 0;
 
         Seed seed;
         seed.genome = std::vector<uint8_t>(100, 0);

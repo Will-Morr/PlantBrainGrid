@@ -22,8 +22,8 @@ TEST_CASE("Leaf energy generation", "[resources]") {
 
     SECTION("Small leaf generates energy based on light") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         // Place a small leaf
         plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
@@ -36,8 +36,8 @@ TEST_CASE("Leaf energy generation", "[resources]") {
 
     SECTION("Big leaf generates more energy than small leaf") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         plant.place_cell(CellType::BigLeaf, {51, 50}, Direction::North, world);
 
@@ -50,8 +50,8 @@ TEST_CASE("Leaf energy generation", "[resources]") {
 
     SECTION("Disabled leaves don't generate energy") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
         plant.toggle_cell({51, 50}, false);
@@ -62,8 +62,8 @@ TEST_CASE("Leaf energy generation", "[resources]") {
 
     SECTION("Multiple leaves stack energy") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
         plant.place_cell(CellType::SmallLeaf, {49, 50}, Direction::North, world);
@@ -82,8 +82,8 @@ TEST_CASE("Root water extraction", "[resources]") {
 
     SECTION("Root extracts water from ground") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         GridCoord root_pos{51, 50};
         float initial_water = 50.0f;
@@ -101,8 +101,8 @@ TEST_CASE("Root water extraction", "[resources]") {
 
     SECTION("Root extracts limited by available water") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         GridCoord root_pos{51, 50};
         float scarce_water = 0.5f;  // Less than root_water_rate
@@ -120,8 +120,8 @@ TEST_CASE("Root water extraction", "[resources]") {
 
     SECTION("Disabled roots don't extract water") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         GridCoord root_pos{51, 50};
         float initial_water = 50.0f;
@@ -143,8 +143,8 @@ TEST_CASE("Root nutrient extraction", "[resources]") {
 
     SECTION("Root extracts nutrients from ground") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         GridCoord root_pos{51, 50};
         float initial_nutrients = 30.0f;
@@ -175,8 +175,8 @@ TEST_CASE("Maintenance costs", "[resources]") {
 
     SECTION("Leaves have water maintenance cost") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
 
@@ -189,10 +189,10 @@ TEST_CASE("Maintenance costs", "[resources]") {
         auto plant1 = make_test_plant({40, 50});
         auto plant2 = make_test_plant({60, 50});
 
-        world.cell_at(plant1.primary_position()).occupant =
-            const_cast<PlantCell*>(plant1.find_cell(plant1.primary_position()));
-        world.cell_at(plant2.primary_position()).occupant =
-            const_cast<PlantCell*>(plant2.find_cell(plant2.primary_position()));
+        world.cell_at(plant1.primary_position()).plant_id = plant1.id();
+        world.cell_at(plant1.primary_position()).cell_type = CellType::Primary;
+        world.cell_at(plant2.primary_position()).plant_id = plant2.id();
+        world.cell_at(plant2.primary_position()).cell_type = CellType::Primary;
 
         plant1.place_cell(CellType::SmallLeaf, {41, 50}, Direction::North, world);
         plant2.place_cell(CellType::BigLeaf, {61, 50}, Direction::North, world);
@@ -206,8 +206,8 @@ TEST_CASE("Maintenance costs", "[resources]") {
 
     SECTION("Maintenance applies even to disabled cells") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
         Resources m1 = ResourceSystem::calculate_maintenance(plant);
@@ -226,8 +226,8 @@ TEST_CASE("Full resource tick", "[resources]") {
 
     SECTION("Resource tick updates plant resources") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         // Add a leaf and root
         GridCoord leaf_pos{51, 50};
@@ -282,8 +282,8 @@ TEST_CASE("Xylem flow", "[resources]") {
 
     SECTION("Enabled xylem costs resources to operate") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         // Add xylem
         plant.place_cell(CellType::Xylem, {51, 50}, Direction::North, world);
@@ -297,8 +297,8 @@ TEST_CASE("Xylem flow", "[resources]") {
 
     SECTION("Disabled xylem doesn't cost resources") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         plant.place_cell(CellType::Xylem, {51, 50}, Direction::North, world);
         plant.toggle_cell({51, 50}, false);
@@ -312,8 +312,8 @@ TEST_CASE("Xylem flow", "[resources]") {
 
     SECTION("FireproofXylem also costs resources") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         plant.place_cell(CellType::FireproofXylem, {51, 50}, Direction::North, world);
 
@@ -331,8 +331,8 @@ TEST_CASE("Seasonal light affects energy", "[resources]") {
 
     SECTION("Energy varies with season") {
         auto plant = make_test_plant();
-        world.cell_at(plant.primary_position()).occupant =
-            const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
 

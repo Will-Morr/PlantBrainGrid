@@ -39,13 +39,14 @@ TEST_CASE("Plant cell placement", "[plant]") {
     plant.resources().nutrients = 1000.0f;
 
     // Register primary cell with world
-    world.cell_at(50, 50).occupant = const_cast<PlantCell*>(plant.find_cell({50, 50}));
+    world.cell_at(50, 50).plant_id = plant.id();
+    world.cell_at(50, 50).cell_type = CellType::Primary;
 
     SECTION("Can place cell adjacent to existing") {
         REQUIRE(plant.can_place_cell(CellType::SmallLeaf, {51, 50}, world));
         REQUIRE(plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world));
         REQUIRE(plant.cell_count() == 2);
-        REQUIRE(world.cell_at(51, 50).occupant != nullptr);
+        REQUIRE(world.cell_at(51, 50).is_occupied());
     }
 
     SECTION("Cannot place cell not adjacent") {
@@ -89,14 +90,15 @@ TEST_CASE("Plant cell removal", "[plant]") {
     plant.resources().energy = 1000.0f;
 
     // Setup
-    world.cell_at(50, 50).occupant = const_cast<PlantCell*>(plant.find_cell({50, 50}));
+    world.cell_at(50, 50).plant_id = plant.id();
+    world.cell_at(50, 50).cell_type = CellType::Primary;
     plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
 
     SECTION("Can remove non-primary cell") {
         REQUIRE(plant.cell_count() == 2);
         REQUIRE(plant.remove_cell({51, 50}, world));
         REQUIRE(plant.cell_count() == 1);
-        REQUIRE(world.cell_at(51, 50).occupant == nullptr);
+        REQUIRE_FALSE(world.cell_at(51, 50).is_occupied());
     }
 
     SECTION("Cannot remove primary cell") {
@@ -116,7 +118,8 @@ TEST_CASE("Plant cell toggle", "[plant]") {
     Plant plant(1, {50, 50}, genome);
     plant.resources().energy = 1000.0f;
 
-    world.cell_at(50, 50).occupant = const_cast<PlantCell*>(plant.find_cell({50, 50}));
+    world.cell_at(50, 50).plant_id = plant.id();
+    world.cell_at(50, 50).cell_type = CellType::Primary;
     plant.place_cell(CellType::Xylem, {51, 50}, Direction::East, world);
 
     SECTION("Can toggle cell enabled state") {
@@ -142,7 +145,8 @@ TEST_CASE("Plant cell rotation", "[plant]") {
     Plant plant(1, {50, 50}, genome);
     plant.resources().energy = 1000.0f;
 
-    world.cell_at(50, 50).occupant = const_cast<PlantCell*>(plant.find_cell({50, 50}));
+    world.cell_at(50, 50).plant_id = plant.id();
+    world.cell_at(50, 50).cell_type = CellType::Primary;
     plant.place_cell(CellType::Xylem, {51, 50}, Direction::North, world);
 
     SECTION("Can rotate xylem cell") {
@@ -193,13 +197,15 @@ TEST_CASE("Plant thorn blocking", "[plant]") {
     // Create first plant with thorn
     Plant plant1(1, {50, 50}, genome);
     plant1.resources().energy = 1000.0f;
-    world.cell_at(50, 50).occupant = const_cast<PlantCell*>(plant1.find_cell({50, 50}));
+    world.cell_at(50, 50).plant_id = plant1.id();
+    world.cell_at(50, 50).cell_type = CellType::Primary;
     plant1.place_cell(CellType::Thorn, {51, 50}, Direction::North, world);
 
     // Create second plant nearby
     Plant plant2(2, {53, 50}, genome);
     plant2.resources().energy = 1000.0f;
-    world.cell_at(53, 50).occupant = const_cast<PlantCell*>(plant2.find_cell({53, 50}));
+    world.cell_at(53, 50).plant_id = plant2.id();
+    world.cell_at(53, 50).cell_type = CellType::Primary;
 
     SECTION("Thorn blocks adjacent placement by other plants") {
         // Position (52, 50) is adjacent to the thorn at (51, 50)

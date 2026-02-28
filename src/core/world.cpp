@@ -1,5 +1,4 @@
 #include "core/world.hpp"
-#include "core/plant_cell.hpp"
 #include <cmath>
 #include <stdexcept>
 
@@ -81,7 +80,7 @@ void World::initialize_terrain() {
 
             cell.light_level = current_light_multiplier();
             cell.fire_ticks = 0;
-            cell.occupant = nullptr;
+            cell.plant_id = 0;
         }
     }
 }
@@ -115,6 +114,8 @@ void World::ignite(const GridCoord& coord) {
     WorldCell& cell = cell_at(coord);
     const auto& cfg = get_config();
 
+    // Only ignite cells that have something to burn
+    if (!cell.is_occupied()) return;
     // Don't ignite if already on fire or too wet
     if (cell.fire_ticks > 0) return;
     if (cell.water_level >= cfg.fire_water_threshold) return;
@@ -126,23 +127,25 @@ void World::update_fire() {
     const auto& cfg = get_config();
 
     burned_out_positions_.clear();
-
-    // Collect cells that should spread fire this tick
     std::vector<GridCoord> spread_sources;
 
     for (uint32_t y = 0; y < height_; ++y) {
         for (uint32_t x = 0; x < width_; ++x) {
             WorldCell& cell = cells_[index(x, y)];
 
-            if (cell.fire_ticks > 0) {
-                --cell.fire_ticks;
+            if (cell.fire_ticks == 0) continue;
 
-                if (cell.fire_ticks == 0) {
-                    // Fire just burned out — destroy whatever is here
-                    burned_out_positions_.push_back({static_cast<int32_t>(x), static_cast<int32_t>(y)});
-                }
+            // Fire on a tile with no cell immediately goes out
+            if (!cell.is_occupied()) {
+                cell.fire_ticks = 0;
+                continue;
+            }
 
-                // Check if this fire should spread
+            --cell.fire_ticks;
+
+            if (cell.fire_ticks == 0) {
+                burned_out_positions_.push_back({static_cast<int32_t>(x), static_cast<int32_t>(y)});
+            } else {
                 uint16_t ticks_burned = cfg.fire_destroy_ticks - cell.fire_ticks;
                 if (ticks_burned >= cfg.fire_spread_ticks) {
                     spread_sources.push_back({static_cast<int32_t>(x), static_cast<int32_t>(y)});
@@ -151,17 +154,15 @@ void World::update_fire() {
         }
     }
 
-    // Spread fire to adjacent cells
+    // Spread to adjacent occupied, non-fireproof cells only
     static const GridCoord offsets[] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
     for (const auto& src : spread_sources) {
         for (const auto& off : offsets) {
             GridCoord neighbor = src + off;
-            if (in_bounds(neighbor)) {
-                // Fire spreads to any non-wet tile; fireproof cells block it
-                const PlantCell* occ = cell_at(neighbor).occupant;
-                if (occ != nullptr && occ->is_fireproof()) continue;
-                ignite(neighbor);
-            }
+            if (!in_bounds(neighbor)) continue;
+            const WorldCell& ncell = cell_at(neighbor);
+            if (!ncell.is_occupied() || ncell.is_fireproof()) continue;
+            ignite(neighbor);
         }
     }
 }

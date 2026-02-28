@@ -402,8 +402,8 @@ bool Brain::execute_instruction(Plant& plant, World& world, std::vector<QueuedAc
             if (std::abs(dx) <= cfg.vision_radius && std::abs(dy) <= cfg.vision_radius) {
                 if (world.in_bounds(pos)) {
                     const WorldCell& wc = world.cell_at(pos);
-                    if (wc.occupant) {
-                        value = static_cast<uint8_t>(wc.occupant->type);
+                    if (wc.is_occupied()) {
+                        value = static_cast<uint8_t>(wc.cell_type);
                     }
                 }
             }

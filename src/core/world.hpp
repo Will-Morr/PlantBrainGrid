@@ -9,18 +9,18 @@
 
 namespace pbg {
 
-// Forward declaration
-struct PlantCell;
-
 struct WorldCell {
     float water_level = 0.0f;
     float nutrient_level = 0.0f;
     float light_level = 1.0f;
     uint16_t fire_ticks = 0;  // 0 = not on fire
-    PlantCell* occupant = nullptr;
+    uint64_t plant_id = 0;    // 0 = unoccupied
+    CellType cell_type = CellType::Primary;  // valid only when plant_id != 0
 
     bool is_on_fire() const { return fire_ticks > 0; }
-    bool is_occupied() const { return occupant != nullptr; }
+    bool is_occupied() const { return plant_id != 0; }
+    bool is_fireproof() const { return cell_type == CellType::FireproofXylem; }
+    bool blocks_placement() const { return cell_type == CellType::Thorn; }
 };
 
 class World {

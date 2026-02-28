@@ -72,7 +72,6 @@ def run_headless(width, height, seed, ticks):
                 f"died={stats.plants_died:>2}"
             )
 
-    print()
     final = len(sim.plants())
     print(f"Done — {final} plant{'s' if final != 1 else ''} alive after {ticks} ticks.")
 
@@ -106,7 +105,6 @@ def run_visual(width, height, seed):
     vis.camera.y = cy - vis.height / (2 * scale)
 
     ticks_per_frame = 1
-
     report_every = 1
     tick = -1
 
@@ -127,6 +125,20 @@ def run_visual(width, height, seed):
             for _ in range(ticks_per_frame):
                 stats = sim.advance_tick()
 
+                # Test ignition
+                for x in range(0, width, 1):
+                    for y in range(0, height, 1):
+                        sim.world().ignite(GridCoord(x, y))
+
+
+                fire_cnt = 0
+                for x in range(width):
+                    for y in range(height):
+                        cell = sim.world().cell_at(GridCoord(cx, cy))
+                        # if cell.fire_ticks != 0:
+                        # if cell.is_occupied():
+                        fire_cnt += cell.fire_ticks
+
                 tick += 1
                 if tick % report_every == 0:
                     print(
@@ -134,7 +146,8 @@ def run_visual(width, height, seed):
                         f"plants={stats.plant_count:>4}  "
                         f"seeds={stats.seed_count:>3}  "
                         f"placed={stats.cells_placed:>3}  "
-                        f"died={stats.plants_died:>2}"
+                        f"died={stats.plants_died:>2}  "
+                        f"fire_cnt={fire_cnt:>2}  "
                     )
                 
         vis.render_world(sim.world(), list(sim.plants()))

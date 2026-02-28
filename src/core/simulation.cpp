@@ -25,7 +25,8 @@ Plant* Simulation::add_plant(const GridCoord& pos, const std::vector<uint8_t>& g
     Plant& plant = plants_.back();
 
     // Register primary cell with world
-    world_.cell_at(pos).occupant = const_cast<PlantCell*>(plant.find_cell(pos));
+    world_.cell_at(pos).plant_id = plant.id();
+    world_.cell_at(pos).cell_type = CellType::Primary;
 
     if (on_plant_birth_) {
         on_plant_birth_(plant);
@@ -53,8 +54,8 @@ void Simulation::remove_dead_plants() {
             for (const auto& cell : plant.cells()) {
                 if (world_.in_bounds(cell.position)) {
                     WorldCell& wc = world_.cell_at(cell.position);
-                    if (wc.occupant && wc.occupant->plant_id == plant.id()) {
-                        wc.occupant = nullptr;
+                    if (wc.plant_id == plant.id()) {
+                        wc.plant_id = 0;
                         wc.fire_ticks = 0;
                     }
                 }
@@ -103,8 +104,8 @@ void Simulation::germinate_seeds() {
 
             // Register with world
             Plant& plant = plants_.back();
-            world_.cell_at(plant.primary_position()).occupant =
-                const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+            world_.cell_at(plant.primary_position()).plant_id = plant.id();
+            world_.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
             if (on_plant_birth_) {
                 on_plant_birth_(plant);
@@ -233,12 +234,13 @@ void Simulation::check_starvation() {
 void Simulation::process_fire_damage() {
     // Only destroy cells where fire just burned out this tick (fire_ticks hit 0)
     for (const GridCoord& pos : world_.burned_out_positions()) {
-        const PlantCell* occ = world_.cell_at(pos).occupant;
-        if (!occ || occ->is_fireproof()) continue;
+        const WorldCell& wc = world_.cell_at(pos);
+        if (!wc.is_occupied() || wc.is_fireproof()) continue;
+        uint64_t pid = wc.plant_id;
 
         for (auto& plant : plants_) {
             if (!plant.is_alive()) continue;
-            if (occ->plant_id != plant.id()) continue;
+            if (pid != plant.id()) continue;
 
             if (pos == plant.primary_position()) {
                 plant.kill();
@@ -491,8 +493,8 @@ void Simulation::load_state(const std::string& filename) {
 
         // Register with world
         if (world_.in_bounds(plant.primary_position())) {
-            world_.cell_at(plant.primary_position()).occupant =
-                const_cast<PlantCell*>(plant.find_cell(plant.primary_position()));
+            world_.cell_at(plant.primary_position()).plant_id = plant.id();
+            world_.cell_at(plant.primary_position()).cell_type = CellType::Primary;
         }
     }
 }
