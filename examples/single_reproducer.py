@@ -108,6 +108,9 @@ def run_visual(width, height, seed):
     report_every = 1
     tick = -1
 
+    backup_every_nth = 1000
+    os.makedirs("sim_backup", exist_ok=True)
+
     while not vis.should_close():
         vis.handle_input()
 
@@ -125,20 +128,6 @@ def run_visual(width, height, seed):
             for _ in range(ticks_per_frame):
                 stats = sim.advance_tick()
 
-                # Test ignition
-                for x in range(0, width, 1):
-                    for y in range(0, height, 1):
-                        sim.world().ignite(GridCoord(x, y))
-
-
-                fire_cnt = 0
-                for x in range(width):
-                    for y in range(height):
-                        cell = sim.world().cell_at(GridCoord(cx, cy))
-                        # if cell.fire_ticks != 0:
-                        # if cell.is_occupied():
-                        fire_cnt += cell.fire_ticks
-
                 tick += 1
                 if tick % report_every == 0:
                     print(
@@ -147,9 +136,11 @@ def run_visual(width, height, seed):
                         f"seeds={stats.seed_count:>3}  "
                         f"placed={stats.cells_placed:>3}  "
                         f"died={stats.plants_died:>2}  "
-                        f"fire_cnt={fire_cnt:>2}  "
                     )
                 
+                if tick > 0 and tick%backup_every_nth == 0:
+                    sim.save_state(f"sim_backup/{tick:016d}")
+
         vis.render_world(sim.world(), list(sim.plants()))
 
     vis.close()
