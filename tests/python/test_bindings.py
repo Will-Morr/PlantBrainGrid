@@ -56,7 +56,7 @@ def test_direction_enum():
 def test_cell_type_enum():
     assert pbg.CellType.Empty != pbg.CellType.Primary
     assert pbg.CellType.SmallLeaf != pbg.CellType.BigLeaf
-    assert pbg.CellType.Root != pbg.CellType.Xylem
+    assert pbg.CellType.FiberRoot != pbg.CellType.Xylem
 
 
 def test_recombination_method_enum():

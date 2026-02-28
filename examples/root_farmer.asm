@@ -38,12 +38,12 @@ main:
     PLACE_CELL Xylem, +0, +1, North
 
     ; Spread roots outward (multiple directions)
-    PLACE_CELL Root, +0, -2, South
-    PLACE_CELL Root, +1, -1, South
-    PLACE_CELL Root, -1, -1, South
-    PLACE_CELL Root, +0, +2, North
-    PLACE_CELL Root, +1, +1, North
-    PLACE_CELL Root, -1, +1, North
+    PLACE_CELL FiberRoot, +0, -2, South
+    PLACE_CELL FiberRoot, +1, -1, South
+    PLACE_CELL FiberRoot, -1, -1, South
+    PLACE_CELL FiberRoot, +0, +2, North
+    PLACE_CELL FiberRoot, +1, +1, North
+    PLACE_CELL FiberRoot, -1, +1, North
 
     ; A couple of leaves to maintain energy income
     PLACE_CELL SmallLeaf, +1, +0, North

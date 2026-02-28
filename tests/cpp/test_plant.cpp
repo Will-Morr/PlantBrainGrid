@@ -56,7 +56,7 @@ TEST_CASE("Plant cell placement", "[plant]") {
 
     SECTION("Cannot place on occupied cell") {
         // Place a cell first
-        plant.place_cell(CellType::Root, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::FiberRoot, {51, 50}, Direction::North, world);
 
         // Try to place another on same spot
         REQUIRE_FALSE(plant.can_place_cell(CellType::SmallLeaf, {51, 50}, world));
@@ -214,7 +214,7 @@ TEST_CASE("Plant thorn blocking", "[plant]") {
 
     SECTION("Thorn does not block owner's adjacent placement") {
         // plant1 can still place adjacent to its own thorn
-        REQUIRE(plant1.can_place_cell(CellType::Root, {51, 51}, world));
+        REQUIRE(plant1.can_place_cell(CellType::FiberRoot, {51, 51}, world));
     }
 }
 

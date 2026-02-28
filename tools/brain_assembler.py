@@ -129,7 +129,8 @@ OPCODES = {
 
 CELL_TYPES = {
     "Empty": 0, "Primary": 1, "SmallLeaf": 2, "BigLeaf": 3,
-    "Root": 4, "Xylem": 5, "FireproofXylem": 6, "Thorn": 7, "FireStarter": 8
+    "FiberRoot": 4, "Xylem": 5, "FireproofXylem": 6, "Thorn": 7, "FireStarter": 8,
+    "TapRoot": 9,
 }
 
 DIRECTIONS = {

@@ -39,8 +39,10 @@ struct Config {
     float big_leaf_energy_rate = 3.0f;
     float big_leaf_water_cost = 2.0f;
     float big_leaf_nutrient_cost = 1.5f;
-    float root_water_rate = 1.5f;
-    float root_nutrient_rate = 0.5f;
+    float primary_water_rate = 0.3f;       // small water draw from primary cell
+    float fiber_root_water_rate = 1.5f;
+    float fiber_root_nutrient_rate = 0.5f;
+    float tap_root_water_rate = 3.5f;      // tap root draws more water, no nutrients
 
     // Cell costs (build and maintenance per cell type)
     //                                    build                  maintain
@@ -48,7 +50,8 @@ struct Config {
     CellCosts primary_costs         = { 0,    0,    0,        0.1f,  0,     0     };
     CellCosts small_leaf_costs      = { 10,   0,    0,        0,     0.2f,  0     };
     CellCosts big_leaf_costs        = { 25,   0,    10,       0,     1.0f,  0.3f  };
-    CellCosts root_costs            = { 8,    0,    0,        0.1f,  0,     0     };
+    CellCosts fiber_root_costs      = { 8,    0,    0,        0.1f,  0,     0     };
+    CellCosts tap_root_costs        = { 12,   0,    0,        0.15f, 0,     0     };
     CellCosts xylem_costs           = { 12,   0,    0,        0.05f, 0,     0     };
     CellCosts fireproof_xylem_costs = { 15,   0,    20,       0.05f, 0,     0     };
     CellCosts thorn_costs           = { 15,   0,    0,        0.1f,  0,     0     };

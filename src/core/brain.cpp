@@ -486,7 +486,7 @@ bool Brain::execute_instruction(Plant& plant, World& world, std::vector<QueuedAc
             int8_t dy = read_arg_signed();
             uint8_t dir_byte = read_arg();
 
-            CellType type = static_cast<CellType>(type_byte % 9);
+            CellType type = static_cast<CellType>(type_byte % 10);
             Direction dir = direction_from_byte(dir_byte);
             GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
 

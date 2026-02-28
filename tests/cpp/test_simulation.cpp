@@ -354,6 +354,8 @@ TEST_CASE("Starvation death", "[simulation]") {
         Plant* plant = sim.add_plant({50, 50}, genome);
         plant->resources().energy = 100.0f;
         plant->resources().water = 0.0f;
+        // Zero out world water at primary position so primary water draw gives 0
+        sim.world().cell_at({50, 50}).water_level = 0.0f;
 
         sim.advance_tick();
 

@@ -7,8 +7,8 @@
 ;   3. Once energy exceeds threshold, launch a seed.
 ;   4. HALT each tick — no instruction-limit penalty.
 ;
-; Body: Primary + 1 Root (below) + 2 SmallLeafs (above, right)
-;   Placement cost: Root(8) + SmallLeaf(10) + SmallLeaf(10) = 28 energy
+; Body: Primary + 1 FiberRoot (below) + 2 SmallLeafs (above, right)
+;   Placement cost: FiberRoot(8) + SmallLeaf(10) + SmallLeaf(10) = 28 energy
 ;   A child starting with 80/2.55 ≈ 31 energy units can afford the whole body.
 ;
 ; Income (fully grown):
@@ -20,7 +20,7 @@
 ;   Net water:      +1.1/tick
 ;
 ; Reproduction (LAUNCH_SEED Alternating, 80, 50, 20, 50, +0, +0, random):
-;   Seed energy:    80/2.55 ≈ 31 units — child can place Root(8)+Leaf(10)+Leaf(10)=28
+;   Seed energy:    80/2.55 ≈ 31 units — child can place FiberRoot(8)+Leaf(10)+Leaf(10)=28
 ;   Seed water:     50/2.55 ≈ 20 units
 ;   Seed nutrients: 20/2.55 ≈  8 units
 ;   Launch power:   50 energy units; max scatter radius = 50 × 2 = 100 cells
@@ -51,7 +51,7 @@ main:
     JUMP_IF_NEQ [GROWN], 0, reproduce
 
     ; --- Growth phase (only runs when cell count < 4) ---
-    PLACE_CELL Root,      +0, +1, North
+    PLACE_CELL FiberRoot,      +0, +1, North
     PLACE_CELL SmallLeaf, +0, -1, North
     PLACE_CELL SmallLeaf, +1,  0, North
     PLACE_CELL SmallLeaf, -1,  0, North

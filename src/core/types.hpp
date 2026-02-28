@@ -74,11 +74,12 @@ enum class CellType : uint8_t {
     Primary = 1,
     SmallLeaf = 2,
     BigLeaf = 3,
-    Root = 4,
+    FiberRoot = 4,
     Xylem = 5,
     FireproofXylem = 6,
     Thorn = 7,
-    FireStarter = 8
+    FireStarter = 8,
+    TapRoot = 9
 };
 
 inline bool is_valid_placeable_cell(CellType type) {

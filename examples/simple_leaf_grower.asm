@@ -29,6 +29,6 @@ main:
     PLACE_CELL SmallLeaf, -1, +0, West     ; west
 
     ; Also try to place a root below us to gather water
-    PLACE_CELL Root, +0, +2, South
+    PLACE_CELL FiberRoot, +0, +2, South
 
     JUMP main

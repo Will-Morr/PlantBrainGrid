@@ -89,12 +89,12 @@ TEST_CASE("Root water extraction", "[resources]") {
         float initial_water = 50.0f;
         world.cell_at(root_pos).water_level = initial_water;
 
-        plant.place_cell(CellType::Root, root_pos, Direction::North, world);
+        plant.place_cell(CellType::FiberRoot, root_pos, Direction::North, world);
 
         float extracted = ResourceSystem::calculate_root_water(plant, world);
 
         REQUIRE(extracted > 0.0f);
-        REQUIRE(extracted <= cfg.root_water_rate);
+        REQUIRE(extracted <= cfg.fiber_root_water_rate);
         // World water is infinite — cell level is not depleted
         REQUIRE(world.cell_at(root_pos).water_level == initial_water);
     }
@@ -108,7 +108,7 @@ TEST_CASE("Root water extraction", "[resources]") {
         float scarce_water = 0.5f;  // Less than root_water_rate
         world.cell_at(root_pos).water_level = scarce_water;
 
-        plant.place_cell(CellType::Root, root_pos, Direction::North, world);
+        plant.place_cell(CellType::FiberRoot, root_pos, Direction::North, world);
 
         float extracted = ResourceSystem::calculate_root_water(plant, world);
 
@@ -127,7 +127,7 @@ TEST_CASE("Root water extraction", "[resources]") {
         float initial_water = 50.0f;
         world.cell_at(root_pos).water_level = initial_water;
 
-        plant.place_cell(CellType::Root, root_pos, Direction::North, world);
+        plant.place_cell(CellType::FiberRoot, root_pos, Direction::North, world);
         plant.toggle_cell(root_pos, false);
 
         float extracted = ResourceSystem::calculate_root_water(plant, world);
@@ -150,12 +150,12 @@ TEST_CASE("Root nutrient extraction", "[resources]") {
         float initial_nutrients = 30.0f;
         world.cell_at(root_pos).nutrient_level = initial_nutrients;
 
-        plant.place_cell(CellType::Root, root_pos, Direction::North, world);
+        plant.place_cell(CellType::FiberRoot, root_pos, Direction::North, world);
 
         float extracted = ResourceSystem::calculate_root_nutrients(plant, world);
 
         REQUIRE(extracted > 0.0f);
-        REQUIRE(extracted <= cfg.root_nutrient_rate);
+        REQUIRE(extracted <= cfg.fiber_root_nutrient_rate);
         // World nutrients are infinite — cell level is not depleted
         REQUIRE(world.cell_at(root_pos).nutrient_level == initial_nutrients);
     }
@@ -236,7 +236,7 @@ TEST_CASE("Full resource tick", "[resources]") {
         world.cell_at(root_pos).nutrient_level = 50.0f;
 
         plant.place_cell(CellType::SmallLeaf, leaf_pos, Direction::North, world);
-        plant.place_cell(CellType::Root, root_pos, Direction::North, world);
+        plant.place_cell(CellType::FiberRoot, root_pos, Direction::North, world);
 
         float initial_energy = plant.resources().energy;
         float initial_water = plant.resources().water;

@@ -24,11 +24,12 @@ CELL_COLORS = {
     1: (139, 69, 19),     # Primary (brown)
     2: (34, 139, 34),     # SmallLeaf (green)
     3: (0, 100, 0),       # BigLeaf (dark green)
-    4: (139, 90, 43),     # Root (sienna)
+    4: (139, 90, 43),     # FiberRoot (sienna)
     5: (210, 180, 140),   # Xylem (tan)
     6: (255, 215, 0),     # FireproofXylem (gold)
     7: (128, 128, 128),   # Thorn (gray)
     8: (255, 69, 0),      # FireStarter (red-orange)
+    9: (110, 55, 90),     # TapRoot (purplish brown)
 }
 
 WATER_COLOR = (0, 100, 200, 100)
@@ -358,7 +359,8 @@ class Visualizer:
             (CellType.Primary,       "Primary",        (180, 100, 40)),
             (CellType.SmallLeaf,     "SmallLeaf",      (34, 139, 34)),
             (CellType.BigLeaf,       "BigLeaf",        (0, 100, 0)),
-            (CellType.Root,          "Root",           (139, 90, 43)),
+            (CellType.FiberRoot,     "FiberRoot",      (139, 90, 43)),
+            (CellType.TapRoot,       "TapRoot",        (110, 55, 90)),
             (CellType.Xylem,         "Xylem",          (210, 180, 140)),
             (CellType.FireproofXylem,"FproofXylem",    (255, 215, 0)),
             (CellType.Thorn,         "Thorn",          (128, 128, 128)),

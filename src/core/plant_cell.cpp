@@ -10,7 +10,8 @@ const CellCosts& get_cell_costs(CellType type) {
         case CellType::Primary:        return cfg.primary_costs;
         case CellType::SmallLeaf:      return cfg.small_leaf_costs;
         case CellType::BigLeaf:        return cfg.big_leaf_costs;
-        case CellType::Root:           return cfg.root_costs;
+        case CellType::FiberRoot:      return cfg.fiber_root_costs;
+        case CellType::TapRoot:        return cfg.tap_root_costs;
         case CellType::Xylem:          return cfg.xylem_costs;
         case CellType::FireproofXylem: return cfg.fireproof_xylem_costs;
         case CellType::Thorn:          return cfg.thorn_costs;

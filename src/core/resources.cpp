@@ -19,6 +19,13 @@ ResourceTickResult ResourceSystem::process_tick(Plant& plant, World& world) {
     result.water_extracted = calculate_root_water(plant, world);
     result.nutrients_extracted = calculate_root_nutrients(plant, world);
 
+    // Primary cell draws a small amount of water from its position
+    const auto& cfg_tick = get_config();
+    if (world.in_bounds(plant.primary_position())) {
+        WorldCell& pwc = world.cell_at(plant.primary_position());
+        result.water_extracted += std::min(pwc.water_level, cfg_tick.primary_water_rate);
+    }
+
     // 2. Add generated resources to plant pool
     plant.resources().energy += result.energy_generated;
     plant.resources().water += result.water_extracted;
@@ -76,14 +83,17 @@ float ResourceSystem::calculate_root_water(const Plant& plant, World& world) {
 
     for (const auto& cell : plant.cells()) {
         if (!cell.enabled) continue;
-        if (cell.type != CellType::Root) continue;
 
-        if (world.in_bounds(cell.position)) {
-            WorldCell& wc = world.cell_at(cell.position);
-            float extract = std::min(wc.water_level, cfg.root_water_rate);
-            // World water is not depleted — roots draw from an infinite supply
-            // (world cell water_level is a quality indicator, not a finite pool)
-            total_water += extract;
+        if (cell.type == CellType::FiberRoot) {
+            if (world.in_bounds(cell.position)) {
+                WorldCell& wc = world.cell_at(cell.position);
+                total_water += std::min(wc.water_level, cfg.fiber_root_water_rate);
+            }
+        } else if (cell.type == CellType::TapRoot) {
+            if (world.in_bounds(cell.position)) {
+                WorldCell& wc = world.cell_at(cell.position);
+                total_water += std::min(wc.water_level, cfg.tap_root_water_rate);
+            }
         }
     }
 
@@ -96,12 +106,11 @@ float ResourceSystem::calculate_root_nutrients(const Plant& plant, World& world)
 
     for (const auto& cell : plant.cells()) {
         if (!cell.enabled) continue;
-        if (cell.type != CellType::Root) continue;
+        if (cell.type != CellType::FiberRoot) continue;  // TapRoot does not draw nutrients
 
         if (world.in_bounds(cell.position)) {
             WorldCell& wc = world.cell_at(cell.position);
-            float extract = std::min(wc.nutrient_level, cfg.root_nutrient_rate);
-            // World nutrients are not depleted — roots draw from an infinite supply
+            float extract = std::min(wc.nutrient_level, cfg.fiber_root_nutrient_rate);
             total_nutrients += extract;
         }
     }
