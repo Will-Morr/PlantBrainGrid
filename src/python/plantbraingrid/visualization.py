@@ -79,7 +79,9 @@ class Visualizer:
         self.show_water = False
         self.show_nutrients = False
         self.show_fire = True
+        self.show_memory = False
         self.paused = False
+        self.step_one = False   # True for exactly one frame when N is pressed
         self._initialized = False
 
     def initialize(self):
@@ -143,10 +145,13 @@ class Visualizer:
             self.show_nutrients = not self.show_nutrients
         if rl.is_key_pressed(rl.KEY_THREE):
             self.show_fire = not self.show_fire
+        if rl.is_key_pressed(rl.KEY_M):
+            self.show_memory = not self.show_memory
 
-        # Pause
+        # Pause / step
         if rl.is_key_pressed(rl.KEY_SPACE):
             self.paused = not self.paused
+        self.step_one = rl.is_key_pressed(rl.KEY_N)
 
         # Deselect
         if rl.is_key_pressed(rl.KEY_ESCAPE):
@@ -226,7 +231,7 @@ class Visualizer:
         status += f"Zoom: {self.camera.zoom:.1f}x  "
         if self.paused:
             status += "[PAUSED]  "
-        status += "1:Water 2:Nutrients 3:Fire  Space:Pause"
+        status += "1:Water 2:Nutrients 3:Fire  M:Memory  Space:Pause  N:Step"
 
         rl.draw_rectangle(0, 0, self.width, 25, rl.Color(0, 0, 0, 180))
         rl.draw_text(status, 10, 5, 16, rl.Color(255, 255, 255, 255))
@@ -235,6 +240,8 @@ class Visualizer:
             for plant in plants:
                 if plant.id() == self.selected_plant_id:
                     self._draw_plant_info(plant)
+                    if self.show_memory:
+                        self._draw_memory_panel(plant)
                     break
 
     def _draw_plant_info(self, plant):
@@ -292,6 +299,79 @@ class Visualizer:
             rl.draw_text(f"  {name}: {count}", panel_x + 5, y, 13,
                         rl.Color(color[0], color[1], color[2], 255))
             y += 16
+
+    def _draw_memory_panel(self, plant):
+        """Draw a hex-dump panel of the selected plant's brain memory."""
+        brain = plant.brain()
+        mem = bytes(brain.memory())
+        ip = brain.ip()
+        halted = brain.is_halted()
+
+        font_size = 10
+        row_height = 12
+        bytes_per_row = 16
+        visible_rows = 32
+        panel_width = 352   # "XXXX: XX XX ... [XX] ... XX" × 16 fits here
+        panel_x = 10
+        panel_y = 35
+        header_height = 18
+
+        total_rows = (len(mem) + bytes_per_row - 1) // bytes_per_row
+        ip_row = ip // bytes_per_row
+
+        # Keep the IP row within the visible window (one-third from top)
+        start_row = max(0, ip_row - visible_rows // 3)
+        start_row = min(start_row, max(0, total_rows - visible_rows))
+        end_row = min(total_rows, start_row + visible_rows)
+
+        panel_height = header_height + 4 + row_height * (end_row - start_row) + 4
+
+        rl.draw_rectangle(panel_x, panel_y, panel_width, panel_height,
+                          rl.Color(0, 0, 0, 210))
+        rl.draw_rectangle_lines(panel_x, panel_y, panel_width, panel_height,
+                                rl.Color(80, 180, 80, 255))
+
+        # Header
+        ip_label = "HALTED" if halted else f"IP=0x{ip:04X}"
+        header = f"Brain memory  {ip_label}  ({len(mem)} bytes)"
+        rl.draw_text(header, panel_x + 5, panel_y + 4, font_size,
+                     rl.Color(100, 255, 100, 255))
+
+        y = panel_y + header_height + 2
+        for row in range(start_row, end_row):
+            offset = row * bytes_per_row
+            is_ip_row = (row == ip_row)
+
+            if is_ip_row:
+                rl.draw_rectangle(panel_x + 1, y, panel_width - 2, row_height,
+                                  rl.Color(60, 60, 0, 255))
+
+            # Build hex string for this row
+            parts = [f"{offset:04X}: "]
+            for col in range(bytes_per_row):
+                if col == 8:
+                    parts.append(" ")
+                idx = offset + col
+                if idx < len(mem):
+                    byte = mem[idx]
+                    if idx == ip:
+                        parts.append(f"[{byte:02X}]")
+                    else:
+                        parts.append(f"{byte:02X} ")
+                else:
+                    parts.append("   ")
+
+            line = "".join(parts)
+            color = (rl.Color(255, 255, 80, 255) if is_ip_row
+                     else rl.Color(160, 220, 160, 255))
+            rl.draw_text(line, panel_x + 5, y, font_size, color)
+            y += row_height
+
+        # Scroll indicator if there are rows outside the visible window
+        if total_rows > visible_rows:
+            shown_pct = f"rows {start_row*16:#06x}–{(end_row-1)*16+15:#06x}"
+            rl.draw_text(shown_pct, panel_x + 5, y + 1, font_size - 1,
+                         rl.Color(100, 140, 100, 255))
 
     def select_plant_at(self, screen_x: int, screen_y: int, plants) -> Optional[int]:
         """Select plant at screen position."""

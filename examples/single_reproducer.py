@@ -13,6 +13,8 @@ Controls (visual mode):
     . / ,              — double / halve simulation speed
     1                  — toggle water overlay
     2                  — toggle nutrient overlay
+    M                  — toggle brain memory hex dump (selected plant)
+    N                  — advance exactly one tick (works while paused)
     Click              — select plant (shows energy/water/nutrients)
     Escape             — deselect
 """
@@ -133,9 +135,12 @@ def run_visual(width, height, seed):
     vis.camera.x = cx - vis.width  / (2 * scale)
     vis.camera.y = cy - vis.height / (2 * scale)
 
-    ticks_per_frame = 1
-    report_every = 1
-    tick = -1
+    vis.paused = True
+
+    ticks_per_frame = 50
+    report_every = ticks_per_frame
+
+    tick = sim.tick()-1
 
     backup_every_nth = 1000
     os.makedirs("sim_backup", exist_ok=True)
@@ -153,22 +158,25 @@ def run_visual(width, height, seed):
         if rl.is_key_pressed(rl.KEY_COMMA):
             ticks_per_frame = max(1, ticks_per_frame // 2)
 
-        if not vis.paused:
-            for _ in range(ticks_per_frame):
-                stats = sim.advance_tick()
+        n_ticks = 0 if vis.paused else ticks_per_frame
+        if vis.step_one:
+            n_ticks = 1
 
-                tick += 1
-                if tick % report_every == 0:
-                    print(
-                        f"  tick {stats.tick:>6}  "
-                        f"plants={stats.plant_count:>4}  "
-                        f"seeds={stats.seed_count:>3}  "
-                        f"placed={stats.cells_placed:>3}  "
-                        f"died={stats.plants_died:>2}  "
-                    )
-                
-                if tick > 0 and tick%backup_every_nth == 0:
-                    sim.save_state(f"sim_backup/{tick:016d}")
+        for _ in range(n_ticks):
+            stats = sim.advance_tick()
+
+            tick += 1
+            if tick % report_every == 0:
+                print(
+                    f"  tick {stats.tick:>6}  "
+                    f"plants={stats.plant_count:>4}  "
+                    f"seeds={stats.seed_count:>3}  "
+                    f"placed={stats.cells_placed:>3}  "
+                    f"died={stats.plants_died:>2}  "
+                )
+
+            if tick > 0 and tick % backup_every_nth == 0:
+                sim.save_state(f"sim_backup/{tick:016d}")
 
         vis.render_world(sim.world(), list(sim.plants()))
 
