@@ -3,6 +3,7 @@
 #include "core/brain_ops.hpp"
 #include "core/plant.hpp"
 #include "core/world.hpp"
+#include <random>
 
 using namespace pbg;
 
@@ -12,6 +13,9 @@ static Plant make_test_plant(const std::vector<uint8_t>& genome) {
     plant.resources() = Resources{1000.0f, 1000.0f, 1000.0f};
     return plant;
 }
+
+// Shared test RNG — seeded deterministically
+static std::mt19937_64 test_rng(12345);
 
 TEST_CASE("Brain construction", "[brain]") {
     SECTION("Constructs from genome") {
@@ -64,7 +68,7 @@ TEST_CASE("Brain control flow instructions", "[brain]") {
         std::vector<uint8_t> genome = {OP_NOP, OP_NOP, OP_HALT};
         auto plant = make_test_plant(genome);
 
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
         // Should have executed all 3 instructions
         REQUIRE(plant.brain().is_halted());
     }
@@ -73,7 +77,7 @@ TEST_CASE("Brain control flow instructions", "[brain]") {
         std::vector<uint8_t> genome = {OP_HALT, OP_NOP, OP_NOP};
         auto plant = make_test_plant(genome);
 
-        auto actions = plant.brain().execute_tick(plant, world);
+        auto actions = plant.brain().execute_tick(plant, world, test_rng);
         REQUIRE(plant.brain().is_halted());
         REQUIRE(plant.brain().ip() == 1);  // Stopped after HALT
     }
@@ -86,7 +90,7 @@ TEST_CASE("Brain control flow instructions", "[brain]") {
         genome[10] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().is_halted());
         REQUIRE(plant.brain().ip() == 11);
@@ -99,7 +103,7 @@ TEST_CASE("Brain control flow instructions", "[brain]") {
         genome[7] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().is_halted());
     }
@@ -115,7 +119,7 @@ TEST_CASE("Brain control flow instructions", "[brain]") {
         genome[15] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().is_halted());
         REQUIRE(plant.brain().ip() == 16);
@@ -132,7 +136,7 @@ TEST_CASE("Brain control flow instructions", "[brain]") {
         genome[5] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().is_halted());
         REQUIRE(plant.brain().ip() == 6);  // Continued past jump
@@ -147,7 +151,7 @@ TEST_CASE("Brain control flow instructions", "[brain]") {
         genome[10] = OP_RET;
 
         auto plant = make_test_plant(genome);
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().is_halted());
         REQUIRE(plant.brain().ip() == 4);  // After HALT following return
@@ -166,7 +170,7 @@ TEST_CASE("Brain arithmetic instructions", "[brain]") {
         genome[4] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().read(20) == 42);
     }
@@ -186,7 +190,7 @@ TEST_CASE("Brain arithmetic instructions", "[brain]") {
         genome[7] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().read(40) == 15);
     }
@@ -203,7 +207,7 @@ TEST_CASE("Brain arithmetic instructions", "[brain]") {
         genome[7] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().read(40) == 12);
     }
@@ -220,7 +224,7 @@ TEST_CASE("Brain arithmetic instructions", "[brain]") {
         genome[7] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().read(40) == 0);
     }
@@ -237,7 +241,7 @@ TEST_CASE("Brain arithmetic instructions", "[brain]") {
         genome[7] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().read(40) == 1);  // 5 < 10
     }
@@ -255,7 +259,7 @@ TEST_CASE("Brain sensing instructions", "[brain]") {
         auto plant = make_test_plant(genome);
         plant.resources().energy = 5.0f;
 
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         // 5.0 * resource_sense_scale, clamped to 255
         uint8_t expected = static_cast<uint8_t>(std::min(255.0f, 5.0f * get_config().resource_sense_scale));
@@ -271,7 +275,7 @@ TEST_CASE("Brain sensing instructions", "[brain]") {
         auto plant = make_test_plant(genome);
         // Plant starts with 1 cell (primary)
 
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().read(20) == 1);
     }
@@ -290,7 +294,7 @@ TEST_CASE("Brain action queueing", "[brain]") {
         genome[5] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        auto actions = plant.brain().execute_tick(plant, world);
+        auto actions = plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(actions.size() == 1);
         REQUIRE(actions[0].type == ActionType::PlaceCell);
@@ -313,7 +317,7 @@ TEST_CASE("Brain action queueing", "[brain]") {
         genome[9] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        auto actions = plant.brain().execute_tick(plant, world);
+        auto actions = plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(actions.size() == 1);
         REQUIRE(actions[0].type == ActionType::LaunchSeed);
@@ -342,7 +346,7 @@ TEST_CASE("Brain error penalties", "[brain]") {
         auto plant = make_test_plant(genome);
         float initial_energy = plant.resources().energy;
 
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.resources().energy < initial_energy);
         float penalty = initial_energy - plant.resources().energy;
@@ -368,7 +372,7 @@ TEST_CASE("Brain randomize instruction", "[brain]") {
             REQUIRE(plant.brain().read(i) == 0);
         }
 
-        plant.brain().execute_tick(plant, world);
+        plant.brain().execute_tick(plant, world, test_rng);
 
         // At least some values should have changed
         int changed = 0;

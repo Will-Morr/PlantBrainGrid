@@ -14,6 +14,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Threading
+find_package(Threads REQUIRED)
+
 # Core library
 file(GLOB_RECURSE CORE_SOURCES "src/core/*.cpp")
 add_library(plantbraingrid_core STATIC ${CORE_SOURCES})
@@ -21,6 +24,7 @@ set_target_properties(plantbraingrid_core PROPERTIES POSITION_INDEPENDENT_CODE O
 target_include_directories(plantbraingrid_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+target_link_libraries(plantbraingrid_core PUBLIC Threads::Threads)
 
 # Python bindings
 if(BUILD_PYTHON_BINDINGS)

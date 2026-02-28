@@ -2,7 +2,10 @@
 #include "core/resources.hpp"
 #include "core/config.hpp"
 #include <algorithm>
+#include <atomic>
 #include <fstream>
+#include <random>
+#include <thread>
 #include <unordered_set>
 
 namespace pbg {
@@ -119,37 +122,67 @@ void Simulation::germinate_seeds() {
 
 std::unordered_map<GridCoord, std::vector<std::pair<uint64_t, QueuedAction>>>
 Simulation::collect_all_actions() {
+    const size_t n = plants_.size();
+
+    // Generate per-plant RNG seeds sequentially to preserve determinism.
+    // Each brain gets its own independent RNG so execute_tick can safely
+    // run in parallel without sharing mutable state.
+    std::vector<uint64_t> plant_seeds(n);
+    for (size_t i = 0; i < n; ++i) {
+        plant_seeds[i] = world_.rng()();
+    }
+
+    // Phase 1 (parallel): execute every brain concurrently.
+    // Brains only read from `world_` (sensing) and write only to their own
+    // plant's brain memory and resource totals — no shared mutable state.
+    std::vector<std::vector<QueuedAction>> plant_actions(n);
+    const unsigned int nthreads = std::max(1u,
+        std::min(static_cast<unsigned int>(n),
+                 std::thread::hardware_concurrency()));
+
+    std::atomic<size_t> next_idx{0};
+    auto worker = [&]() {
+        while (true) {
+            size_t idx = next_idx.fetch_add(1, std::memory_order_relaxed);
+            if (idx >= n) break;
+            auto& plant = plants_[idx];
+            if (!plant.is_alive()) continue;
+            std::mt19937_64 rng(plant_seeds[idx]);
+            plant_actions[idx] = plant.brain().execute_tick(plant, world_, rng);
+        }
+    };
+
+    std::vector<std::thread> threads;
+    threads.reserve(nthreads);
+    for (unsigned int t = 0; t < nthreads; ++t) {
+        threads.emplace_back(worker);
+    }
+    for (auto& t : threads) t.join();
+
+    // Phase 2 (sequential): process collected actions.
     std::unordered_map<GridCoord, std::vector<std::pair<uint64_t, QueuedAction>>> all_actions;
 
-    // Execute all plant brains (could be parallelized in the future)
-    for (auto& plant : plants_) {
+    for (size_t i = 0; i < n; ++i) {
+        auto& plant = plants_[i];
         if (!plant.is_alive()) continue;
 
-        auto actions = plant.brain().execute_tick(plant, world_);
-
-        for (auto& action : actions) {
+        for (auto& action : plant_actions[i]) {
             if (action.type == ActionType::PlaceCell ||
                 action.type == ActionType::RemoveCell) {
                 all_actions[action.position].emplace_back(plant.id(), std::move(action));
             } else if (action.type == ActionType::LaunchSeed) {
-                // Seeds don't conflict spatially at launch time
-                // Process immediately
                 if (action.seed_params) {
-                    // Find father if mate was selected
                     const Plant* father = nullptr;
                     if (plant.brain().mate_search().selected_mate_id != 0) {
                         father = find_plant(plant.brain().mate_search().selected_mate_id);
                     }
-
                     auto seed = ReproductionSystem::create_seed(
                         plant, father, *action.seed_params, world_.rng());
-
                     if (seed) {
                         add_seed(std::move(*seed));
                     }
                 }
             } else {
-                // Toggle and rotate don't conflict, apply directly
                 if (action.type == ActionType::ToggleCell) {
                     plant.toggle_cell(action.position, action.toggle_state);
                 } else if (action.type == ActionType::RotateCell) {

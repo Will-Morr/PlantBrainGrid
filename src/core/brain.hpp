@@ -90,8 +90,10 @@ public:
     void reset_halt() { halted_ = false; }
 
     // Execute one tick of brain logic
-    // Returns queued actions and modifies plant resources on errors
-    std::vector<QueuedAction> execute_tick(Plant& plant, World& world);
+    // Returns queued actions and modifies plant resources on errors.
+    // rng is used for the RANDOMIZE instruction; pass a per-plant RNG for
+    // thread-safe parallel execution.
+    std::vector<QueuedAction> execute_tick(Plant& plant, const World& world, std::mt19937_64& rng);
 
     // Execution trace for debugging/visualization
     void enable_tracing(bool enable) { trace_enabled_ = enable; }
@@ -119,7 +121,7 @@ private:
     uint32_t oob_count_ = 0;
 
     // Execute a single instruction, returns true if should continue
-    bool execute_instruction(Plant& plant, World& world, std::vector<QueuedAction>& actions);
+    bool execute_instruction(Plant& plant, const World& world, std::mt19937_64& rng, std::vector<QueuedAction>& actions);
 
     // Read argument bytes from memory (advances ip)
     uint8_t read_arg();

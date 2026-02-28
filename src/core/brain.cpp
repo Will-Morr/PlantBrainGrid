@@ -75,7 +75,7 @@ int8_t Brain::read_arg_signed() {
     return static_cast<int8_t>(read_arg());
 }
 
-std::vector<QueuedAction> Brain::execute_tick(Plant& plant, World& world) {
+std::vector<QueuedAction> Brain::execute_tick(Plant& plant, const World& world, std::mt19937_64& rng) {
     const auto& cfg = get_config();
     std::vector<QueuedAction> actions;
 
@@ -90,7 +90,7 @@ std::vector<QueuedAction> Brain::execute_tick(Plant& plant, World& world) {
     uint32_t instruction_count = 0;
 
     while (!halted_ && instruction_count < cfg.max_instructions_per_tick) {
-        if (!execute_instruction(plant, world, actions)) {
+        if (!execute_instruction(plant, world, rng, actions)) {
             break;
         }
         ++instruction_count;
@@ -117,7 +117,7 @@ std::vector<QueuedAction> Brain::execute_tick(Plant& plant, World& world) {
     return actions;
 }
 
-bool Brain::execute_instruction(Plant& plant, World& world, std::vector<QueuedAction>& actions) {
+bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_64& rng, std::vector<QueuedAction>& actions) {
     const auto& cfg = get_config();
 
     // Fetch and decode
@@ -344,7 +344,7 @@ bool Brain::execute_instruction(Plant& plant, World& world, std::vector<QueuedAc
         case OP_RANDOMIZE: {
             uint16_t start = read_arg16();
             uint8_t length = read_arg();
-            randomize_range(start, length, world.rng());
+            randomize_range(start, length, rng);
             break;
         }
 
