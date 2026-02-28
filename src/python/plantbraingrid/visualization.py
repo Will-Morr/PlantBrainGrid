@@ -184,10 +184,6 @@ class Visualizer:
                     rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
                                       rl.Color(139, 69, 19, alpha))
 
-                if self.show_fire and cell.is_on_fire():
-                    rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
-                                      rl.Color(255, 100, 0, 200))
-
         # Draw plant cells
         for plant in plants:
             if not plant.is_alive():
@@ -208,6 +204,16 @@ class Visualizer:
                 if is_selected:
                     rl.draw_rectangle_lines(int(sx), int(sy), cell_px, cell_px,
                                             rl.Color(255, 255, 0, 255))
+
+        # Draw fire overlay on top of plant cells
+        if self.show_fire:
+            for y in range(start_y, end_y):
+                for x in range(start_x, end_x):
+                    cell = world.cell_at(x, y)
+                    if cell.is_on_fire():
+                        sx, sy = self.camera.world_to_screen(x, y)
+                        rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
+                                          rl.Color(255, 100, 0, 200))
 
         # Draw UI
         self._draw_ui(world, plants)
