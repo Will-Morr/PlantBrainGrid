@@ -83,6 +83,9 @@ class Visualizer:
         self.paused = False
         self.step_one = False   # True for exactly one frame when N is pressed
         self._initialized = False
+        self._traced_plant_id: Optional[int] = None
+        self._trace_history: list = []   # list of (ip: int, name: str)
+        self._last_collected_tick: int = -1
 
     def initialize(self, fullscreen: bool = False):
         """Initialize raylib window."""
@@ -163,11 +166,60 @@ class Visualizer:
         if rl.is_key_pressed(rl.KEY_ESCAPE):
             self.selected_plant_id = None
 
+    def _collect_trace(self, world, plants):
+        """Manage brain tracing for the selected plant."""
+        from plantbraingrid.brain_viewer import OPCODES, NUM_OPCODES
+
+        selected = next((p for p in plants if p.id() == self.selected_plant_id), None)
+
+        if selected is None:
+            # Deselected — disable tracing and clear history
+            if self._traced_plant_id is not None:
+                old = next((p for p in plants if p.id() == self._traced_plant_id), None)
+                if old is not None:
+                    old.brain().enable_tracing(False)
+                self._traced_plant_id = None
+                self._trace_history.clear()
+                self._last_collected_tick = -1
+            return
+
+        brain = selected.brain()
+
+        if self._traced_plant_id != self.selected_plant_id:
+            # Selection changed — disable old plant's tracing, reset history
+            if self._traced_plant_id is not None:
+                old = next((p for p in plants if p.id() == self._traced_plant_id), None)
+                if old is not None:
+                    old.brain().enable_tracing(False)
+            self._trace_history.clear()
+            self._last_collected_tick = -1
+            self._traced_plant_id = self.selected_plant_id
+            brain.enable_tracing(True)
+            return
+
+        # Same plant — ensure tracing stays on and collect new steps
+        brain.enable_tracing(True)
+        current_tick = world.tick()
+        if current_tick == self._last_collected_tick:
+            return  # Paused: same tick, nothing new to collect
+        self._last_collected_tick = current_tick
+
+        trace = brain.last_trace()
+        if trace is not None:
+            for step in trace['steps']:
+                opcode = step['opcode'] % NUM_OPCODES
+                name = OPCODES.get(opcode, (f"UNK({opcode:02X})",))[0]
+                self._trace_history.append((step['ip'], name))
+            if len(self._trace_history) > 200:
+                self._trace_history = self._trace_history[-200:]
+
     def render_world(self, world, plants):
         """Render the world grid and plants."""
         # Sync every frame so fullscreen toggle and resize are always reflected
         self.width = rl.get_render_width()
         self.height = rl.get_render_height()
+
+        self._collect_trace(world, plants)
 
         rl.begin_drawing()
         rl.clear_background(rl.Color(30, 30, 30, 255))
@@ -252,6 +304,7 @@ class Visualizer:
                     self._draw_plant_info(plant)
                     if self.show_memory:
                         self._draw_memory_panel(plant)
+                        self._draw_trace_panel()
                     break
 
     def _draw_plant_info(self, plant):
@@ -381,6 +434,50 @@ class Visualizer:
         if total_rows > visible_rows:
             shown_pct = f"rows {start_row*16:#06x}–{(end_row-1)*16+15:#06x}"
             rl.draw_text(shown_pct, panel_x + 5, y + 1, font_size - 1,
+                         rl.Color(100, 140, 100, 255))
+
+    def _draw_trace_panel(self):
+        """Draw the execution trace panel (recent instructions, newest at bottom)."""
+        if not self._trace_history:
+            return
+
+        font_size = 10
+        row_height = 12
+        visible_rows = 32
+        panel_width = 200
+        panel_x = 10 + 352 + 8   # right of hex-dump panel
+        panel_y = 35
+        header_height = 18
+
+        history = self._trace_history[-visible_rows:]
+        n_rows = len(history)
+        panel_height = header_height + 4 + row_height * n_rows + 4
+
+        rl.draw_rectangle(panel_x, panel_y, panel_width, panel_height,
+                          rl.Color(0, 0, 0, 210))
+        rl.draw_rectangle_lines(panel_x, panel_y, panel_width, panel_height,
+                                rl.Color(80, 180, 80, 255))
+
+        total = len(self._trace_history)
+        header = f"Trace  ({total} steps)"
+        rl.draw_text(header, panel_x + 5, panel_y + 4, font_size,
+                     rl.Color(100, 255, 100, 255))
+
+        y = panel_y + header_height + 2
+        for i, (ip, name) in enumerate(history):
+            is_last = (i == n_rows - 1)
+            if is_last:
+                rl.draw_rectangle(panel_x + 1, y, panel_width - 2, row_height,
+                                  rl.Color(60, 60, 0, 255))
+            line = f"{ip:04X}  {name}"
+            color = (rl.Color(255, 255, 80, 255) if is_last
+                     else rl.Color(160, 220, 160, 255))
+            rl.draw_text(line, panel_x + 5, y, font_size, color)
+            y += row_height
+
+        if total > visible_rows:
+            note = f"(+{total - visible_rows} earlier)"
+            rl.draw_text(note, panel_x + 5, y + 1, font_size - 1,
                          rl.Color(100, 140, 100, 255))
 
     def select_plant_at(self, screen_x: int, screen_y: int, plants) -> Optional[int]:
