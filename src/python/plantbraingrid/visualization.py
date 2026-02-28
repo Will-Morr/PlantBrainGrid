@@ -84,10 +84,12 @@ class Visualizer:
         self.step_one = False   # True for exactly one frame when N is pressed
         self._initialized = False
 
-    def initialize(self):
+    def initialize(self, fullscreen: bool = False):
         """Initialize raylib window."""
         if self._initialized:
             return
+        if fullscreen:
+            rl.set_config_flags(rl.FLAG_FULLSCREEN_MODE)
         rl.init_window(self.width, self.height, self.title)
         rl.set_target_fps(60)
         self._initialized = True
@@ -153,12 +155,20 @@ class Visualizer:
             self.paused = not self.paused
         self.step_one = rl.is_key_pressed(rl.KEY_N)
 
+        # Fullscreen toggle
+        if rl.is_key_pressed(rl.KEY_F):
+            rl.toggle_fullscreen()
+
         # Deselect
         if rl.is_key_pressed(rl.KEY_ESCAPE):
             self.selected_plant_id = None
 
     def render_world(self, world, plants):
         """Render the world grid and plants."""
+        # Sync every frame so fullscreen toggle and resize are always reflected
+        self.width = rl.get_render_width()
+        self.height = rl.get_render_height()
+
         rl.begin_drawing()
         rl.clear_background(rl.Color(30, 30, 30, 255))
 
@@ -231,7 +241,7 @@ class Visualizer:
         status += f"Zoom: {self.camera.zoom:.1f}x  "
         if self.paused:
             status += "[PAUSED]  "
-        status += "1:Water 2:Nutrients 3:Fire  M:Memory  Space:Pause  N:Step"
+        status += "1:Water 2:Nutrients 3:Fire  M:Memory  Space:Pause  N:Step  F:Fullscreen"
 
         rl.draw_rectangle(0, 0, self.width, 25, rl.Color(0, 0, 0, 180))
         rl.draw_text(status, 10, 5, 16, rl.Color(255, 255, 255, 255))

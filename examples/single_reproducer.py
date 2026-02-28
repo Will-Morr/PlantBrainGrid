@@ -15,6 +15,7 @@ Controls (visual mode):
     2                  — toggle nutrient overlay
     M                  — toggle brain memory hex dump (selected plant)
     N                  — advance exactly one tick (works while paused)
+    F                  — toggle fullscreen
     Click              — select plant (shows energy/water/nutrients)
     Escape             — deselect
 """
@@ -104,7 +105,7 @@ def run_headless(width, height, seed, ticks):
     print(f"Done — {final} plant{'s' if final != 1 else ''} alive after {ticks} ticks.")
 
 
-def run_visual(width, height, seed):
+def run_visual(width, height, seed, fullscreen=False):
     try:
         import pyray as rl
         from plantbraingrid.visualization import Visualizer
@@ -126,7 +127,7 @@ def run_visual(width, height, seed):
     print()
 
     vis = Visualizer(1280, 720, "PlantBrainGrid — single reproducer")
-    vis.initialize()
+    vis.initialize(fullscreen=fullscreen)
 
     # Centre view on the starting plant.
     # screen = (world - camera) * zoom * cell_size  →  camera = world - screen/(zoom*cell_size)
@@ -193,12 +194,14 @@ def main():
                         help='Ticks to run in headless mode (default: 3000)')
     parser.add_argument('--headless', action='store_true',
                         help='Run without visualization even if raylib is available')
+    parser.add_argument('--fullscreen', action='store_true',
+                        help='Start in fullscreen mode')
     args = parser.parse_args()
 
     if args.headless:
         run_headless(args.width, args.height, args.seed, args.ticks)
     else:
-        run_visual(args.width, args.height, args.seed)
+        run_visual(args.width, args.height, args.seed, fullscreen=args.fullscreen)
 
 
 if __name__ == '__main__':
