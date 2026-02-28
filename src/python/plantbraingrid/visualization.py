@@ -1,8 +1,16 @@
 """Visualization module using raylib."""
 
+import os
 from dataclasses import dataclass
 from typing import Optional, Tuple
 import math
+
+_MONO_FONT_CANDIDATES = [
+    # "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf",
+    # "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeMono.ttf",
+]
 
 try:
     import pyray as rl
@@ -83,6 +91,7 @@ class Visualizer:
         self.paused = False
         self.step_one = False   # True for exactly one frame when N is pressed
         self._initialized = False
+        self._mono_font = None
         self._traced_plant_id: Optional[int] = None
         self._trace_history: list = []   # list of (ip: int, name: str)
         self._last_collected_tick: int = -1
@@ -96,10 +105,17 @@ class Visualizer:
         rl.init_window(self.width, self.height, self.title)
         rl.set_target_fps(60)
         self._initialized = True
+        for path in _MONO_FONT_CANDIDATES:
+            if os.path.exists(path):
+                self._mono_font = rl.load_font_ex(path, 12, None, 0)
+                break
 
     def close(self):
         """Close raylib window."""
         if self._initialized:
+            if self._mono_font is not None:
+                rl.unload_font(self._mono_font)
+                self._mono_font = None
             rl.close_window()
             self._initialized = False
 
@@ -168,7 +184,9 @@ class Visualizer:
 
     def _collect_trace(self, world, plants):
         """Manage brain tracing for the selected plant."""
-        from plantbraingrid.brain_viewer import OPCODES, NUM_OPCODES
+        from plantbraingrid.brain_viewer import (OPCODES, NUM_OPCODES,
+                                                  decode_instruction,
+                                                  format_instruction)
 
         selected = next((p for p in plants if p.id() == self.selected_plant_id), None)
 
@@ -206,10 +224,17 @@ class Visualizer:
 
         trace = brain.last_trace()
         if trace is not None:
+            mem = bytes(brain.memory())
             for step in trace['steps']:
-                opcode = step['opcode'] % NUM_OPCODES
-                name = OPCODES.get(opcode, (f"UNK({opcode:02X})",))[0]
-                self._trace_history.append((step['ip'], name))
+                ip = step['ip']
+                result = decode_instruction(mem, ip)
+                if result is not None:
+                    name, args, _ = result
+                    formatted = format_instruction(name, args)
+                else:
+                    opcode = step['opcode'] % NUM_OPCODES
+                    formatted = OPCODES.get(opcode, (f"UNK({opcode:02X})",))[0]
+                self._trace_history.append((ip, formatted))
             if len(self._trace_history) > 200:
                 self._trace_history = self._trace_history[-200:]
 
@@ -287,6 +312,15 @@ class Visualizer:
 
         rl.end_drawing()
 
+    def _draw_mono(self, text: str, x: int, y: int, size: int, color):
+        """Draw text using the loaded monospaced font, or fall back to the default font."""
+        if self._mono_font is not None:
+            rl.draw_text_ex(self._mono_font, text,
+                            rl.Vector2(float(x), float(y)),
+                            float(size), 0.0, color)
+        else:
+            rl.draw_text(text, x, y, size, color)
+
     def _draw_ui(self, world, plants):
         """Draw UI overlay."""
         status = f"Tick: {world.tick()}  Plants: {len(plants)}  "
@@ -303,8 +337,8 @@ class Visualizer:
                 if plant.id() == self.selected_plant_id:
                     self._draw_plant_info(plant)
                     if self.show_memory:
-                        self._draw_memory_panel(plant)
-                        self._draw_trace_panel()
+                        mem_bottom = self._draw_memory_panel(plant)
+                        self._draw_trace_panel(mem_bottom + 6)
                     break
 
     def _draw_plant_info(self, plant):
@@ -370,11 +404,11 @@ class Visualizer:
         ip = brain.ip()
         halted = brain.is_halted()
 
-        font_size = 10
-        row_height = 12
+        font_size = 14
+        row_height = 14
         bytes_per_row = 16
         visible_rows = 32
-        panel_width = 352   # "XXXX: XX XX ... [XX] ... XX" × 16 fits here
+        panel_width = 420   # "XXXX: XX XX ... [XX] ... XX" × 16 at font_size=12
         panel_x = 10
         panel_y = 35
         header_height = 18
@@ -397,8 +431,8 @@ class Visualizer:
         # Header
         ip_label = "HALTED" if halted else f"IP=0x{ip:04X}"
         header = f"Brain memory  {ip_label}  ({len(mem)} bytes)"
-        rl.draw_text(header, panel_x + 5, panel_y + 4, font_size,
-                     rl.Color(100, 255, 100, 255))
+        self._draw_mono(header, panel_x + 5, panel_y + 4, font_size,
+                        rl.Color(100, 255, 100, 255))
 
         y = panel_y + header_height + 2
         for row in range(start_row, end_row):
@@ -427,27 +461,33 @@ class Visualizer:
             line = "".join(parts)
             color = (rl.Color(255, 255, 80, 255) if is_ip_row
                      else rl.Color(160, 220, 160, 255))
-            rl.draw_text(line, panel_x + 5, y, font_size, color)
+            self._draw_mono(line, panel_x + 5, y, font_size, color)
             y += row_height
 
         # Scroll indicator if there are rows outside the visible window
         if total_rows > visible_rows:
             shown_pct = f"rows {start_row*16:#06x}–{(end_row-1)*16+15:#06x}"
-            rl.draw_text(shown_pct, panel_x + 5, y + 1, font_size - 1,
-                         rl.Color(100, 140, 100, 255))
+            self._draw_mono(shown_pct, panel_x + 5, y + 1, font_size,
+                            rl.Color(100, 140, 100, 255))
 
-    def _draw_trace_panel(self):
-        """Draw the execution trace panel (recent instructions, newest at bottom)."""
+        return panel_y + panel_height
+
+    def _draw_trace_panel(self, top_y: int):
+        """Draw execution trace below the memory panel (newest instruction at bottom)."""
         if not self._trace_history:
             return
 
-        font_size = 10
-        row_height = 12
-        visible_rows = 32
-        panel_width = 200
-        panel_x = 10 + 352 + 8   # right of hex-dump panel
-        panel_y = 35
+        font_size = 12
+        row_height = 14
+        panel_width = 420   # same width as memory panel
+        panel_x = 10
+        panel_y = top_y
         header_height = 18
+
+        # How many rows fit between top_y and the bottom of the screen
+        available_px = self.height - panel_y - 4
+        visible_rows = max(1, (available_px - header_height - 8) // row_height)
+        visible_rows = min(visible_rows, 20)
 
         history = self._trace_history[-visible_rows:]
         n_rows = len(history)
@@ -460,25 +500,25 @@ class Visualizer:
 
         total = len(self._trace_history)
         header = f"Trace  ({total} steps)"
-        rl.draw_text(header, panel_x + 5, panel_y + 4, font_size,
-                     rl.Color(100, 255, 100, 255))
+        self._draw_mono(header, panel_x + 5, panel_y + 4, font_size,
+                        rl.Color(100, 255, 100, 255))
 
         y = panel_y + header_height + 2
-        for i, (ip, name) in enumerate(history):
+        for i, (ip, formatted) in enumerate(history):
             is_last = (i == n_rows - 1)
             if is_last:
                 rl.draw_rectangle(panel_x + 1, y, panel_width - 2, row_height,
                                   rl.Color(60, 60, 0, 255))
-            line = f"{ip:04X}  {name}"
+            line = f"{ip:04X}  {formatted}"
             color = (rl.Color(255, 255, 80, 255) if is_last
                      else rl.Color(160, 220, 160, 255))
-            rl.draw_text(line, panel_x + 5, y, font_size, color)
+            self._draw_mono(line, panel_x + 5, y, font_size, color)
             y += row_height
 
         if total > visible_rows:
             note = f"(+{total - visible_rows} earlier)"
-            rl.draw_text(note, panel_x + 5, y + 1, font_size - 1,
-                         rl.Color(100, 140, 100, 255))
+            self._draw_mono(note, panel_x + 5, y + 1, font_size,
+                            rl.Color(100, 140, 100, 255))
 
     def select_plant_at(self, screen_x: int, screen_y: int, plants) -> Optional[int]:
         """Select plant at screen position."""
