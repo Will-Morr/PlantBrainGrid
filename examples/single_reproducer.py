@@ -29,10 +29,33 @@ sys.path.insert(0, _root)  # _plantbraingrid.so lives here
 from _plantbraingrid import Simulation, GridCoord
 
 
+def _find_latest_backup(backup_dir="sim_backup"):
+    """Return the path to the most recent backup file, or None if none exist."""
+    if not os.path.isdir(backup_dir):
+        return None
+    entries = sorted(
+        (e for e in os.listdir(backup_dir) if not e.startswith('.')),
+        reverse=True,
+    )
+    return os.path.join(backup_dir, entries[0]) if entries else None
+
+
 def _build_sim(width, height, seed):
-    """Create the simulation and seed it with one reproducer plant at the centre."""
+    """Create the simulation and seed it with one reproducer plant at the centre.
+
+    If a backup exists in sim_backup/, the most recent one is loaded instead of
+    starting fresh. Returns (sim, genome_path, genome_len, resumed_from) where
+    resumed_from is the backup path (str) or None.
+    """
     genome_path = os.path.join(os.path.dirname(__file__), 'reproducer.bin')
     genome = list(open(genome_path, 'rb').read())
+
+    backup = _find_latest_backup()
+    if backup is not None:
+        sim = Simulation(width, height, seed)
+        sim.load_state(backup)
+        print(f"Resumed from backup: {backup}")
+        return sim, genome_path, len(genome), backup
 
     sim = Simulation(width, height, seed)
 
@@ -46,16 +69,19 @@ def _build_sim(width, height, seed):
     plant.resources().water     = 100.0
     plant.resources().nutrients = 100.0
 
-    return sim, genome_path, len(genome)
+    return sim, genome_path, len(genome), None
 
 
 def run_headless(width, height, seed, ticks):
-    sim, genome_path, genome_len = _build_sim(width, height, seed)
+    sim, genome_path, genome_len, resumed_from = _build_sim(width, height, seed)
     cx, cy = width // 2, height // 2
 
     print(f"World:  {width}x{height}  seed={seed}")
     print(f"Genome: {genome_path}  ({genome_len} bytes)")
-    print(f"Start:  1 plant at ({cx}, {cy})")
+    if resumed_from:
+        print(f"Resumed from: {resumed_from}  tick={sim.tick()}")
+    else:
+        print(f"Start:  1 plant at ({cx}, {cy})")
     print()
 
     report_every = max(1, ticks // 20)
@@ -85,12 +111,15 @@ def run_visual(width, height, seed):
         run_headless(width, height, seed, ticks=5000)
         return
 
-    sim, genome_path, genome_len = _build_sim(width, height, seed)
+    sim, genome_path, genome_len, resumed_from = _build_sim(width, height, seed)
     cx, cy = width // 2, height // 2
 
     print(f"World:  {width}x{height}  seed={seed}")
     print(f"Genome: {genome_path}  ({genome_len} bytes)")
-    print(f"Start:  1 plant at ({cx}, {cy})")
+    if resumed_from:
+        print(f"Resumed from: {resumed_from}  tick={sim.tick()}")
+    else:
+        print(f"Start:  1 plant at ({cx}, {cy})")
     print("Controls: WASD/arrows=pan  scroll=zoom  space=pause  ./,=speed  1=water  2=nutrients  click=select")
     print()
 
