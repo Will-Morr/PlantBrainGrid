@@ -253,12 +253,12 @@ TEST_CASE("Brain sensing instructions", "[brain]") {
         genome[3] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        plant.resources().energy = 50.0f;
+        plant.resources().energy = 5.0f;
 
         plant.brain().execute_tick(plant, world);
 
-        // 50 * 2.55 = 127.5 -> 127
-        uint8_t expected = static_cast<uint8_t>(50.0f * get_config().resource_sense_scale);
+        // 5.0 * resource_sense_scale, clamped to 255
+        uint8_t expected = static_cast<uint8_t>(std::min(255.0f, 5.0f * get_config().resource_sense_scale));
         REQUIRE(plant.brain().read(20) == expected);
     }
 
