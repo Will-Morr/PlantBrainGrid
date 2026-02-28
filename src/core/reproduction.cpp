@@ -162,13 +162,46 @@ void ReproductionSystem::apply_mutations(
     uint8_t /*mutation_magnitude*/,
     std::mt19937_64& rng)
 {
+    if (genome.empty()) return;
+
+    const auto& cfg = get_config();
     std::uniform_real_distribution<float> prob(0.0f, 1.0f);
     std::uniform_int_distribution<int> byte_dist(0, 255);
 
+    // Per-byte point mutations
     for (auto& byte : genome) {
         if (prob(rng) < mutation_rate) {
             byte = static_cast<uint8_t>(byte_dist(rng));
         }
+    }
+
+    // Block mutation: every seed gets one contiguous block either randomized
+    // or copied from another location within the genome.
+    size_t genome_size = genome.size();
+    size_t min_block = static_cast<size_t>(cfg.mutation_block_min_size);
+    size_t max_block = std::min(static_cast<size_t>(cfg.mutation_block_max_size), genome_size);
+    min_block = std::min(min_block, max_block);
+
+    std::uniform_int_distribution<uint32_t> size_dist(
+        static_cast<uint32_t>(min_block),
+        static_cast<uint32_t>(max_block));
+    size_t block_size = static_cast<size_t>(size_dist(rng));
+
+    std::uniform_int_distribution<uint32_t> pos_dist(
+        0u, static_cast<uint32_t>(genome_size - block_size));
+    size_t dest = static_cast<size_t>(pos_dist(rng));
+
+    if (prob(rng) < 0.5f) {
+        // Randomize the block
+        for (size_t i = 0; i < block_size; ++i) {
+            genome[dest + i] = static_cast<uint8_t>(byte_dist(rng));
+        }
+    } else {
+        // Copy from another location (use temp buffer to handle overlap)
+        size_t src = static_cast<size_t>(pos_dist(rng));
+        std::vector<uint8_t> tmp(genome.begin() + src,
+                                 genome.begin() + src + block_size);
+        std::copy(tmp.begin(), tmp.end(), genome.begin() + dest);
     }
 }
 

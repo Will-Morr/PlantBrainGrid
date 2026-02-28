@@ -105,13 +105,21 @@ TEST_CASE("Genome recombination", "[reproduction]") {
 TEST_CASE("Mutation application", "[reproduction]") {
     std::mt19937_64 rng(42);
 
-    SECTION("Zero mutation rate produces no changes") {
+    SECTION("Zero mutation rate still applies one block mutation") {
+        // Per-byte mutations are suppressed, but a block mutation always fires.
         std::vector<uint8_t> genome(100, 42);
         std::vector<uint8_t> original = genome;
 
         ReproductionSystem::apply_mutations(genome, 0.0f, 16, rng);
 
-        REQUIRE(genome == original);
+        // The block mutation must have changed at least one byte
+        REQUIRE(genome != original);
+        // But not all bytes should have changed (block << whole genome)
+        int unchanged = 0;
+        for (size_t i = 0; i < genome.size(); ++i) {
+            if (genome[i] == original[i]) ++unchanged;
+        }
+        REQUIRE(unchanged > 0);
     }
 
     SECTION("High mutation rate changes genome") {

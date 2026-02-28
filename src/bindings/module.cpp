@@ -67,6 +67,8 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def_readwrite("oob_memory_penalty", &Config::oob_memory_penalty)
         .def_readwrite("instruction_limit_penalty", &Config::instruction_limit_penalty)
         .def_readwrite("mutation_rate", &Config::mutation_rate)
+        .def_readwrite("mutation_block_min_size", &Config::mutation_block_min_size)
+        .def_readwrite("mutation_block_max_size", &Config::mutation_block_max_size)
         .def_readwrite("season_length", &Config::season_length)
         .def_readwrite("xylem_transfer_cost", &Config::xylem_transfer_cost)
         .def_readwrite("fire_spread_ticks", &Config::fire_spread_ticks)
