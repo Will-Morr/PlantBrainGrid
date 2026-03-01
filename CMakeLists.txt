@@ -79,6 +79,10 @@ if(BUILD_TESTS)
         Catch2::Catch2WithMain
     )
 
+    target_compile_definitions(plantbraingrid_tests PRIVATE
+        EXAMPLES_DIR="${CMAKE_SOURCE_DIR}/examples"
+    )
+
     include(CTest)
     include(Catch)
     catch_discover_tests(plantbraingrid_tests)

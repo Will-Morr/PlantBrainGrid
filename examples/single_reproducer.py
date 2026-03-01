@@ -62,15 +62,17 @@ def _build_sim(width, height, seed):
 
     sim = Simulation(width, height, seed)
 
-    cx, cy = width // 2, height // 2
-    plant = sim.add_plant(GridCoord(cx, cy), genome)
-    if plant is None:
-        print("Failed to place initial plant — position occupied?")
-        sys.exit(1)
+    # cx, cy = width // 2, height // 2
+    # plant = sim.add_plant(GridCoord(cx, cy), genome)
+    # if plant is None:
+    #     print("Failed to place initial plant — position occupied?")
+    #     sys.exit(1)
 
-    plant.resources().energy    = 200.0
-    plant.resources().water     = 100.0
-    plant.resources().nutrients = 100.0
+    # plant.resources().energy    = 200.0
+    # plant.resources().water     = 100.0
+    # plant.resources().nutrients = 100.0
+
+    sim.enable_auto_spawn(True, min_population=10, energy=200.0, water=100.0, nutrients=30.0)
 
     return sim, genome_path, len(genome), None
 

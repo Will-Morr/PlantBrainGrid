@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include "core/simulation.hpp"
 #include "core/config.hpp"
+#include <fstream>
+#include <vector>
 
 using namespace pbg;
 
@@ -389,6 +391,29 @@ TEST_CASE("Starvation death", "[simulation]") {
         }
         REQUIRE(died);
     }
+}
+
+TEST_CASE("Reproducer colonises world", "[simulation]") {
+    // Load the compiled reproducer genome from examples/reproducer.bin
+    std::string bin_path = std::string(EXAMPLES_DIR) + "/reproducer.bin";
+    std::ifstream f(bin_path, std::ios::binary);
+    REQUIRE(f.good());
+    std::vector<uint8_t> genome(
+        (std::istreambuf_iterator<char>(f)),
+        std::istreambuf_iterator<char>());
+    REQUIRE_FALSE(genome.empty());
+
+    // 128×128 world gives seeds (max radius 100) plenty of room to land
+    Simulation sim(128, 128, 42);
+    Plant* plant = sim.add_plant({64, 64}, genome);
+    REQUIRE(plant != nullptr);
+    plant->resources().energy    = 500.0f;
+    plant->resources().water     = 300.0f;
+    plant->resources().nutrients = 200.0f;
+
+    sim.run(100);
+
+    REQUIRE(sim.plants().size() >= 5);
 }
 
 TEST_CASE("Simulation determinism", "[simulation]") {

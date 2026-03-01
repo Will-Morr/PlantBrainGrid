@@ -76,7 +76,7 @@ struct Config {
     float light_amplitude = 0.1f;
 
     // Scaling for brain sensing (convert float resources to 0-255 byte)
-    float resource_sense_scale = 25.5f;  // 1000 resource = 255 byte value
+    float resource_sense_scale = 2.55f;  // 100 resource = 255 byte value
 };
 
 // Global config instance (can be modified before simulation starts)
