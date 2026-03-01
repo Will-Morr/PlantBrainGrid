@@ -411,9 +411,9 @@ TEST_CASE("Reproducer colonises world", "[simulation]") {
     plant->resources().water     = 300.0f;
     plant->resources().nutrients = 200.0f;
 
-    sim.run(100);
+    sim.run(10000);
 
-    REQUIRE(sim.plants().size() >= 5);
+    REQUIRE(sim.plants().size() >= 50);
 }
 
 TEST_CASE("Simulation determinism", "[simulation]") {
