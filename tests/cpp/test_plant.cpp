@@ -218,6 +218,75 @@ TEST_CASE("Plant thorn blocking", "[plant]") {
     }
 }
 
+TEST_CASE("Placement resource requirements", "[plant]") {
+    // Helper: build a plant at (50,50) with given resources and register it with world.
+    std::vector<uint8_t> genome(100, 0);
+
+    auto setup = [&](World& world, float e, float w, float n) {
+        Plant plant(1, {50, 50}, genome);
+        plant.resources().energy    = e;
+        plant.resources().water     = w;
+        plant.resources().nutrients = n;
+        world.cell_at(50, 50).plant_id  = 1;
+        world.cell_at(50, 50).cell_type = CellType::Primary;
+        return plant;
+    };
+
+    SECTION("SmallLeaf: exact energy allows placement") {
+        World world(100, 100, 42);
+        const CellCosts& cost = get_cell_costs(CellType::SmallLeaf);
+        auto plant = setup(world, cost.build_energy, 1000.0f, 1000.0f);
+        REQUIRE(plant.can_place_cell(CellType::SmallLeaf, {51, 50}, world));
+    }
+
+    SECTION("SmallLeaf: insufficient energy blocks placement") {
+        World world(100, 100, 42);
+        const CellCosts& cost = get_cell_costs(CellType::SmallLeaf);
+        auto plant = setup(world, cost.build_energy - 0.01f, 1000.0f, 1000.0f);
+        REQUIRE_FALSE(plant.can_place_cell(CellType::SmallLeaf, {51, 50}, world));
+    }
+
+    SECTION("BigLeaf: exact energy and nutrients allows placement") {
+        World world(100, 100, 42);
+        const CellCosts& cost = get_cell_costs(CellType::BigLeaf);
+        auto plant = setup(world, cost.build_energy, 1000.0f, cost.build_nutrients);
+        REQUIRE(plant.can_place_cell(CellType::BigLeaf, {51, 50}, world));
+    }
+
+    SECTION("BigLeaf: insufficient energy blocks placement") {
+        World world(100, 100, 42);
+        const CellCosts& cost = get_cell_costs(CellType::BigLeaf);
+        auto plant = setup(world, cost.build_energy - 0.01f, 1000.0f, cost.build_nutrients);
+        REQUIRE_FALSE(plant.can_place_cell(CellType::BigLeaf, {51, 50}, world));
+    }
+
+    SECTION("BigLeaf: insufficient nutrients blocks placement") {
+        World world(100, 100, 42);
+        const CellCosts& cost = get_cell_costs(CellType::BigLeaf);
+        auto plant = setup(world, cost.build_energy, 1000.0f, cost.build_nutrients - 0.01f);
+        REQUIRE_FALSE(plant.can_place_cell(CellType::BigLeaf, {51, 50}, world));
+    }
+
+    SECTION("BigLeaf: energy and nutrients are deducted on placement") {
+        World world(100, 100, 42);
+        const CellCosts& cost = get_cell_costs(CellType::BigLeaf);
+        auto plant = setup(world, cost.build_energy + 10.0f, 1000.0f, cost.build_nutrients + 10.0f);
+        REQUIRE(plant.place_cell(CellType::BigLeaf, {51, 50}, Direction::North, world));
+        REQUIRE(plant.resources().energy    == 10.0f);
+        REQUIRE(plant.resources().nutrients == 10.0f);
+        REQUIRE(plant.cell_count() == 2);
+    }
+
+    SECTION("BigLeaf: water is not required to build (build_water == 0)") {
+        // No cell type has a non-zero water build cost; BigLeaf confirms this.
+        World world(100, 100, 42);
+        const CellCosts& cost = get_cell_costs(CellType::BigLeaf);
+        REQUIRE(cost.build_water == 0.0f);
+        auto plant = setup(world, cost.build_energy, 0.0f, cost.build_nutrients);
+        REQUIRE(plant.can_place_cell(CellType::BigLeaf, {51, 50}, world));
+    }
+}
+
 TEST_CASE("Plant resource management", "[plant]") {
     std::vector<uint8_t> genome(100, 0);
 
