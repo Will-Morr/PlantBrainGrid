@@ -110,6 +110,9 @@ private:
     // Process fire damage to plant cells
     void process_fire_damage();
 
+    // Thorns damage adjacent cells belonging to other plants
+    void process_thorn_damage();
+
     // Kill plants that have run out of energy or water
     void check_starvation();
 

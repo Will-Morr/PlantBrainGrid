@@ -88,6 +88,7 @@ class Visualizer:
         self.show_water = False
         self.show_nutrients = False
         self.show_fire = True
+        self.show_plants = True
         self.show_memory = False
         self.paused = False
         self.step_one = False   # True for exactly one frame when N is pressed
@@ -167,6 +168,8 @@ class Visualizer:
             self.show_nutrients = not self.show_nutrients
         if rl.is_key_pressed(rl.KEY_THREE):
             self.show_fire = not self.show_fire
+        if rl.is_key_pressed(rl.KEY_FOUR):
+            self.show_plants = not self.show_plants
         if rl.is_key_pressed(rl.KEY_M):
             self.show_memory = not self.show_memory
 
@@ -278,25 +281,26 @@ class Visualizer:
                                       rl.Color(139, 69, 19, alpha))
 
         # Draw plant cells
-        for plant in plants:
-            if not plant.is_alive():
-                continue
+        if self.show_plants:
+            for plant in plants:
+                if not plant.is_alive():
+                    continue
 
-            is_selected = self.selected_plant_id == plant.id()
+                is_selected = self.selected_plant_id == plant.id()
 
-            for cell in plant.cells():
-                sx, sy = self.camera.world_to_screen(cell.position.x, cell.position.y)
+                for cell in plant.cells():
+                    sx, sy = self.camera.world_to_screen(cell.position.x, cell.position.y)
 
-                color = CELL_COLORS.get(int(cell.type), (255, 0, 255))
-                if not cell.enabled:
-                    color = tuple(c // 2 for c in color)
+                    color = CELL_COLORS.get(int(cell.type), (255, 0, 255))
+                    if not cell.enabled:
+                        color = tuple(c // 2 for c in color)
 
-                rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
-                                  rl.Color(color[0], color[1], color[2], 255))
+                    rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
+                                      rl.Color(color[0], color[1], color[2], 255))
 
-                if is_selected:
-                    rl.draw_rectangle_lines(int(sx), int(sy), cell_px, cell_px,
-                                            rl.Color(255, 255, 0, 255))
+                    if is_selected:
+                        rl.draw_rectangle_lines(int(sx), int(sy), cell_px, cell_px,
+                                                rl.Color(255, 255, 0, 255))
 
         # Draw fire overlay on top of plant cells
         if self.show_fire:
@@ -328,7 +332,7 @@ class Visualizer:
         status += f"Zoom: {self.camera.zoom:.1f}x  "
         if self.paused:
             status += "[PAUSED]  "
-        status += "1:Water 2:Nutrients 3:Fire  M:Memory  Space:Pause  N:Step  F:Fullscreen"
+        status += "1:Water 2:Nutrients 3:Fire 4:Plants  M:Memory  Space:Pause  N:Step  F:Fullscreen"
 
         rl.draw_rectangle(0, 0, self.width, 25, rl.Color(0, 0, 0, 180))
         rl.draw_text(status, 10, 5, 16, rl.Color(255, 255, 255, 255))

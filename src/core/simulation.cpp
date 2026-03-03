@@ -285,6 +285,50 @@ void Simulation::process_fire_damage() {
     }
 }
 
+void Simulation::process_thorn_damage() {
+    static const GridCoord offsets[] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+
+    struct DamageEvent {
+        uint64_t victim_id;
+        GridCoord pos;
+        bool is_primary;
+    };
+    std::vector<DamageEvent> events;
+
+    for (const auto& attacker : plants_) {
+        if (!attacker.is_alive()) continue;
+
+        for (const auto& cell : attacker.cells()) {
+            if (cell.type != CellType::Thorn) continue;
+
+            for (const auto& offset : offsets) {
+                GridCoord neighbor = cell.position + offset;
+                if (!world_.in_bounds(neighbor)) continue;
+
+                const WorldCell& wc = world_.cell_at(neighbor);
+                if (!wc.is_occupied() || wc.plant_id == attacker.id()) continue;
+
+                const Plant* victim = find_plant(wc.plant_id);
+                if (!victim || !victim->is_alive()) continue;
+
+                events.push_back({wc.plant_id, neighbor,
+                                  neighbor == victim->primary_position()});
+            }
+        }
+    }
+
+    for (const auto& ev : events) {
+        Plant* victim = find_plant(ev.victim_id);
+        if (!victim || !victim->is_alive()) continue;
+
+        if (ev.is_primary) {
+            victim->kill();
+        } else {
+            victim->remove_cell(ev.pos, world_);
+        }
+    }
+}
+
 void Simulation::check_plant_deaths() {
     for (auto& plant : plants_) {
         if (!plant.is_alive()) continue;
@@ -325,20 +369,23 @@ TickStats Simulation::advance_tick() {
     stats.cells_removed = action_stats.cells_removed;
     stats.placements_cancelled = action_stats.placements_cancelled;
 
-    // 8. Update seeds in flight
+    // 8. Thorns damage adjacent enemy cells
+    process_thorn_damage();
+
+    // 9. Update seeds in flight
     update_seeds();
 
-    // 9. Germinate landed seeds
+    // 10. Germinate landed seeds
     size_t seeds_before = seeds_.size();
     germinate_seeds();
     stats.seeds_germinated = seeds_before - seeds_.size();
 
-    // 10. Remove dead plants
+    // 11. Remove dead plants
     size_t plants_before = plants_.size();
     remove_dead_plants();
     stats.plants_died = plants_before - plants_.size();
 
-    // 10. Auto-spawn if enabled and population is low
+    // 12. Auto-spawn if enabled and population is low
     check_auto_spawn();
 
     // Update stats

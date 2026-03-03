@@ -188,6 +188,77 @@ TEST_CASE("Action conflict resolution", "[simulation]") {
     }
 }
 
+TEST_CASE("Thorn damage to adjacent plants", "[simulation]") {
+    std::vector<uint8_t> genome(100, 0);
+
+    SECTION("Thorn destroys adjacent enemy cell") {
+        // Layout (x→): attacker(50) - thorn(51) - leaf(52) - victim(53)
+        // Add both plants before using any pointers to avoid dangling after reallocation.
+        Simulation sim(100, 100, 42);
+        sim.add_plant({50, 50}, genome);
+        sim.add_plant({53, 50}, genome);
+
+        Plant* attacker = sim.find_plant(1);
+        Plant* victim   = sim.find_plant(2);
+        attacker->resources().energy = 1000.0f;
+        attacker->resources().water  = 1000.0f;
+        victim->resources().energy   = 1000.0f;
+        victim->resources().water    = 1000.0f;
+
+        // Give victim a leaf adjacent to its primary
+        victim->place_cell(CellType::SmallLeaf, {52, 50}, Direction::North, sim.world());
+        REQUIRE(victim->cell_count() == 2);
+
+        // Give attacker a thorn adjacent to its primary (and adjacent to the victim leaf)
+        attacker->place_cell(CellType::Thorn, {51, 50}, Direction::North, sim.world());
+        REQUIRE(attacker->cell_count() == 2);
+
+        // One tick should trigger thorn damage and remove the leaf
+        sim.advance_tick();
+
+        REQUIRE(victim->cell_count() == 1);  // only primary remains
+    }
+
+    SECTION("Thorn kills plant when primary is adjacent") {
+        // Layout: attacker(50) - thorn(51) - victim_primary(52)
+        Simulation sim(100, 100, 42);
+        sim.add_plant({50, 50}, genome);
+        sim.add_plant({52, 50}, genome);
+
+        Plant* attacker = sim.find_plant(1);
+        Plant* victim   = sim.find_plant(2);
+        attacker->resources().energy = 1000.0f;
+        attacker->resources().water  = 1000.0f;
+        victim->resources().energy   = 1000.0f;
+        victim->resources().water    = 1000.0f;
+
+        // Place thorn directly adjacent to victim's primary
+        attacker->place_cell(CellType::Thorn, {51, 50}, Direction::North, sim.world());
+        REQUIRE(attacker->cell_count() == 2);
+
+        sim.advance_tick();
+
+        REQUIRE(sim.plants().size() == 1);  // victim dead and removed
+        REQUIRE(sim.plants()[0].id() == 1); // attacker survives
+    }
+
+    SECTION("Thorn does not damage own cells") {
+        // Layout: primary(50) - thorn(51) - own_leaf(52)
+        Simulation sim(100, 100, 42);
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 1000.0f;
+        plant->resources().water  = 1000.0f;
+
+        plant->place_cell(CellType::Thorn,     {51, 50}, Direction::North, sim.world());
+        plant->place_cell(CellType::SmallLeaf, {52, 50}, Direction::North, sim.world());
+
+        sim.advance_tick();
+
+        // Own leaf next to own thorn must survive
+        REQUIRE(plant->cell_count() == 3);
+    }
+}
+
 TEST_CASE("Fire damage to plants", "[simulation]") {
     Simulation sim(100, 100, 42);
     std::vector<uint8_t> genome(100, 0);
