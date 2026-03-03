@@ -93,29 +93,30 @@ TEST_CASE("Root water extraction", "[resources]") {
 
         float extracted = ResourceSystem::calculate_root_water(plant, world);
 
+        // Extraction = water_level * rate (multiplicative model)
         REQUIRE(extracted > 0.0f);
-        REQUIRE(extracted <= cfg.fiber_root_water_rate);
+        REQUIRE_THAT(extracted, WithinAbs(initial_water * cfg.fiber_root_water_rate, 0.01f));
         // World water is infinite — cell level is not depleted
         REQUIRE(world.cell_at(root_pos).water_level == initial_water);
     }
 
-    SECTION("Root extracts limited by available water") {
+    SECTION("Extraction scales with world water level") {
         auto plant = make_test_plant();
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         GridCoord root_pos{51, 50};
-        float scarce_water = 0.5f;  // Less than root_water_rate
-        world.cell_at(root_pos).water_level = scarce_water;
+        float low_water = 0.5f;
+        world.cell_at(root_pos).water_level = low_water;
 
         plant.place_cell(CellType::FiberRoot, root_pos, Direction::North, world);
 
         float extracted = ResourceSystem::calculate_root_water(plant, world);
 
-        // Extraction is capped by the cell's water level
-        REQUIRE_THAT(extracted, WithinAbs(scarce_water, 0.01f));
+        // Extraction = water_level * rate (multiplicative model)
+        REQUIRE_THAT(extracted, WithinAbs(low_water * cfg.fiber_root_water_rate, 0.01f));
         // Cell level is not depleted (infinite supply)
-        REQUIRE_THAT(world.cell_at(root_pos).water_level, WithinAbs(scarce_water, 0.01f));
+        REQUIRE_THAT(world.cell_at(root_pos).water_level, WithinAbs(low_water, 0.01f));
     }
 
     SECTION("Disabled roots don't extract water") {
@@ -154,8 +155,9 @@ TEST_CASE("Root nutrient extraction", "[resources]") {
 
         float extracted = ResourceSystem::calculate_root_nutrients(plant, world);
 
+        // Extraction = nutrient_level * rate (multiplicative model)
         REQUIRE(extracted > 0.0f);
-        REQUIRE(extracted <= cfg.fiber_root_nutrient_rate);
+        REQUIRE_THAT(extracted, WithinAbs(initial_nutrients * cfg.fiber_root_nutrient_rate, 0.01f));
         // World nutrients are infinite — cell level is not depleted
         REQUIRE(world.cell_at(root_pos).nutrient_level == initial_nutrients);
     }

@@ -423,6 +423,9 @@ TickStats Simulation::advance_tick() {
     stats.cells_removed = action_stats.cells_removed;
     stats.placements_cancelled = action_stats.placements_cancelled;
 
+    // 7.5 Kill plants that went negative from placement costs or penalties
+    check_starvation();
+
     // 8. Thorns damage adjacent enemy cells
     process_thorn_damage();
 

@@ -448,6 +448,48 @@ TEST_CASE("Starvation death", "[simulation]") {
         REQUIRE_FALSE(sim.plants().empty());
     }
 
+    SECTION("Plant with negative energy dies after tick") {
+        Simulation sim(100, 100, 42);
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = -1.0f;
+        plant->resources().water  = 100.0f;
+
+        sim.advance_tick();
+
+        REQUIRE(sim.plants().empty());
+    }
+
+    SECTION("Plant with negative water dies after tick") {
+        Simulation sim(100, 100, 42);
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 100.0f;
+        plant->resources().water  = -1.0f;
+
+        sim.advance_tick();
+
+        REQUIRE(sim.plants().empty());
+    }
+
+    SECTION("Negative resources from placement cost kill the plant") {
+        // Brain places a cell costing 10 energy; plant only has 5 — goes negative.
+        // OP_PLACE_CELL=0x60, SmallLeaf=2, dx=+1, dy=0, dir=0, HALT=0x01
+        std::vector<uint8_t> placer(1024, 0);
+        placer[0] = 0x60; placer[1] = 0x02;
+        placer[2] = 0x01; placer[3] = 0x00;
+        placer[4] = 0x00; placer[5] = 0x01;
+
+        Simulation sim(100, 100, 42);
+        Plant* plant = sim.add_plant({50, 50}, placer);
+        // SmallLeaf build cost = 10 energy; give the plant only 5
+        const CellCosts& cost = get_cell_costs(CellType::SmallLeaf);
+        plant->resources().energy = cost.build_energy * 0.5f;
+        plant->resources().water  = 1000.0f;
+
+        sim.advance_tick();
+
+        REQUIRE(sim.plants().empty());
+    }
+
     SECTION("Plant drains to zero over time and dies") {
         Simulation sim(100, 100, 42);
         // Give minimal resources and no leaves/roots — maintenance will drain them

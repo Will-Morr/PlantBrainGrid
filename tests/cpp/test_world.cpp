@@ -98,8 +98,9 @@ TEST_CASE("World terrain generation", "[world]") {
             }
         }
 
-        REQUIRE(max_water - min_water > 10.0f);  // Should have significant variation
-        REQUIRE(max_nutrient - min_nutrient > 5.0f);
+        // water = base(1) + amplitude(2) * perlin[-1,1], range ≈ [0, 3]
+        REQUIRE(max_water - min_water > 1.5f);
+        REQUIRE(max_nutrient - min_nutrient > 1.0f);
     }
 
     SECTION("regenerate_terrain restores initial state") {
