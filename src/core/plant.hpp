@@ -101,6 +101,17 @@ public:
     // Tick age
     void advance_age() { ++age_; }
 
+    // Increment every cell's age_ticks by 1
+    void advance_cell_ages() {
+        for (auto& cell : cells_) {
+            ++cell.age_ticks;
+        }
+    }
+
+    // Remove non-primary cells that have reached max_cell_age.
+    // The primary cell is exempt — plant-level death is handled via max_plant_age.
+    void cull_old_cells(uint32_t max_cell_age, World& world);
+
     // Pay resource cost
     bool pay_cost(const CellCosts& cost);
     bool pay_cost(float energy, float water, float nutrients);

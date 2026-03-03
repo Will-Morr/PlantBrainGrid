@@ -12,6 +12,7 @@ struct PlantCell {
     bool enabled = true;
     Direction direction = Direction::North;  // For xylem: resource flow direction
     uint64_t plant_id = 0;  // Owner plant ID
+    uint64_t age_ticks = 0; // How many ticks this cell has been alive
 
     PlantCell() = default;
     PlantCell(CellType type_, const GridCoord& pos_, Direction dir_ = Direction::North)

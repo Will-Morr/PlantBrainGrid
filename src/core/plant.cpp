@@ -213,4 +213,19 @@ bool Plant::pay_cost(float energy, float water, float nutrients) {
     return true;
 }
 
+void Plant::cull_old_cells(uint32_t max_cell_age, World& world) {
+    // Primary cell is exempt from cell-age death (whole-plant lifespan is
+    // governed by max_plant_age, not per-cell age).
+    std::vector<GridCoord> to_remove;
+    for (const auto& cell : cells_) {
+        if (cell.position != primary_pos_ && cell.age_ticks >= max_cell_age) {
+            to_remove.push_back(cell.position);
+        }
+    }
+
+    for (const auto& pos : to_remove) {
+        remove_cell(pos, world);
+    }
+}
+
 }  // namespace pbg

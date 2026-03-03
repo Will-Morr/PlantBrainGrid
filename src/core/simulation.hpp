@@ -116,6 +116,9 @@ private:
     // Kill plants that have run out of energy or water
     void check_starvation();
 
+    // Kill plants/cells that have reached max age
+    void check_old_age();
+
     // Spawn a plant with a randomized genome at a random empty position
     Plant* spawn_random_plant();
 

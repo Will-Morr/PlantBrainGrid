@@ -192,9 +192,29 @@ Simulation::collect_all_actions() {
         }
 
         plant.advance_age();
+        plant.advance_cell_ages();
     }
 
     return all_actions;
+}
+
+void Simulation::check_old_age() {
+    const auto& cfg = get_config();
+
+    for (auto& plant : plants_) {
+        if (!plant.is_alive()) continue;
+
+        // Plant-level age limit
+        if (cfg.max_plant_age > 0 && plant.age() >= cfg.max_plant_age) {
+            plant.kill();
+            continue;
+        }
+
+        // Cell-level age limit (primary cell is exempt)
+        if (cfg.max_cell_age > 0) {
+            plant.cull_old_cells(cfg.max_cell_age, world_);
+        }
+    }
 }
 
 TickStats Simulation::apply_actions(
@@ -232,10 +252,41 @@ TickStats Simulation::apply_actions(
         if (!plant || !plant->is_alive()) continue;
 
         if (action.type == ActionType::PlaceCell) {
-            // Always charge the cost; use place_cell_free since cost is pre-paid
-            plant->force_deduct_placement_cost(action.cell_type);
-            if (plant->place_cell_free(action.cell_type, action.position, action.direction, world_)) {
-                ++stats.cells_placed;
+            if (!world_.in_bounds(action.position)) {
+                // Out-of-bounds placement: charge full cost but don't place
+                plant->force_deduct_placement_cost(action.cell_type);
+                continue;
+            }
+            const WorldCell& wc = world_.cell_at(action.position);
+
+            if (wc.is_occupied() && wc.plant_id == plant_id) {
+                // Placing on own existing cell: charge 10% of build cost as penalty
+                const CellCosts& cost = get_cell_costs(action.cell_type);
+                plant->resources().energy    -= cost.build_energy    * 0.1f;
+                plant->resources().water     -= cost.build_water     * 0.1f;
+                plant->resources().nutrients -= cost.build_nutrients * 0.1f;
+            } else {
+                // Displace any cell from a different plant that occupies this tile
+                if (wc.is_occupied()) {
+                    Plant* other = find_plant(wc.plant_id);
+                    if (other && other->is_alive()) {
+                        if (action.position == other->primary_position()) {
+                            other->kill();
+                        } else {
+                            other->remove_cell(action.position, world_);
+                        }
+                    }
+                    // Clear world reference so place_cell_free sees an empty tile
+                    // (covers both the killed-primary case and any stale ghost cells)
+                    world_.cell_at(action.position).plant_id = 0;
+                    world_.cell_at(action.position).fire_ticks = 0;
+                }
+
+                // Charge full cost and attempt placement
+                plant->force_deduct_placement_cost(action.cell_type);
+                if (plant->place_cell_free(action.cell_type, action.position, action.direction, world_)) {
+                    ++stats.cells_placed;
+                }
             }
         } else if (action.type == ActionType::RemoveCell) {
             if (plant->remove_cell(action.position, world_)) {
@@ -360,8 +411,11 @@ TickStats Simulation::advance_tick() {
     // 5. Kill plants that have exhausted energy or water
     check_starvation();
 
-    // 6. Execute all brains and collect actions
+    // 6. Execute all brains and collect actions (also advances plant and cell ages)
     auto actions = collect_all_actions();
+
+    // 6.5 Kill plants/cells that have reached their maximum age
+    check_old_age();
 
     // 7. Apply non-conflicting actions
     TickStats action_stats = apply_actions(actions);

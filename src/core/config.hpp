@@ -70,6 +70,10 @@ struct Config {
     uint16_t fire_destroy_ticks = 12;
     float fire_water_threshold = 999.9f;
 
+    // Old age
+    uint32_t max_cell_age = 1000;   // ticks before a cell dies of old age (0 = disabled)
+    uint32_t max_plant_age = 10000; // ticks before a plant dies of old age (0 = disabled)
+
     // Seasons
     uint32_t season_length = 1000;
     float base_light = 1.0f;

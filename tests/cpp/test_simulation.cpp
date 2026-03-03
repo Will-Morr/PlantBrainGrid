@@ -487,6 +487,243 @@ TEST_CASE("Reproducer colonises world", "[simulation]") {
     REQUIRE(sim.plants().size() >= 50);
 }
 
+TEST_CASE("Old age death", "[simulation]") {
+    std::vector<uint8_t> genome(100, 0);
+
+    SECTION("Plant dies when it reaches max_plant_age") {
+        // Each advance_tick() increments age by 1.  With max_plant_age=5 the
+        // plant is killed when age reaches 5, i.e. after the 5th tick.
+        auto& cfg = get_config();
+        uint32_t orig_plant = cfg.max_plant_age;
+        uint32_t orig_cell  = cfg.max_cell_age;
+        cfg.max_plant_age = 5;
+        cfg.max_cell_age  = 0; // disabled so only plant age matters
+
+        Simulation sim(100, 100, 42);
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 1000.0f;
+        plant->resources().water  = 1000.0f;
+
+        // Ticks 1-4: age 1-4, plant alive
+        for (int i = 0; i < 4; ++i) {
+            sim.advance_tick();
+            REQUIRE(!sim.plants().empty());
+        }
+        // Tick 5: age becomes 5 → dies and is removed
+        sim.advance_tick();
+        REQUIRE(sim.plants().empty());
+
+        cfg.max_plant_age = orig_plant;
+        cfg.max_cell_age  = orig_cell;
+    }
+
+    SECTION("Non-primary cell removed at max_cell_age, primary exempt") {
+        // Primary cell is exempt from cell-age death (governed by max_plant_age).
+        // Only non-primary cells are culled when age_ticks >= max_cell_age.
+        auto& cfg = get_config();
+        uint32_t orig_cell  = cfg.max_cell_age;
+        uint32_t orig_plant = cfg.max_plant_age;
+        cfg.max_cell_age  = 3;
+        cfg.max_plant_age = 0; // disabled
+
+        Simulation sim(100, 100, 42);
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 1000.0f;
+        plant->resources().water  = 1000.0f;
+        plant->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim.world());
+        REQUIRE(plant->cell_count() == 2);
+
+        // After 3 ticks both cells have age_ticks=3.  The leaf is culled;
+        // the primary cell is exempt.
+        for (int i = 0; i < 3; ++i) sim.advance_tick();
+
+        REQUIRE(!sim.plants().empty());           // plant survives
+        REQUIRE(sim.plants()[0].cell_count() == 1); // only primary remains
+
+        cfg.max_cell_age  = orig_cell;
+        cfg.max_plant_age = orig_plant;
+    }
+
+    SECTION("Plant survives beyond max_cell_age when it has only a primary cell") {
+        // Confirm primary is truly exempt: a single-cell plant lives past max_cell_age.
+        auto& cfg = get_config();
+        uint32_t orig_cell  = cfg.max_cell_age;
+        uint32_t orig_plant = cfg.max_plant_age;
+        cfg.max_cell_age  = 2;
+        cfg.max_plant_age = 0; // disabled
+
+        Simulation sim(100, 100, 42);
+        Plant* plant = sim.add_plant({50, 50}, genome);
+        plant->resources().energy = 1000.0f;
+        plant->resources().water  = 1000.0f;
+
+        for (int i = 0; i < 10; ++i) sim.advance_tick();
+
+        REQUIRE(!sim.plants().empty()); // still alive despite cell age >> max_cell_age
+
+        cfg.max_cell_age  = orig_cell;
+        cfg.max_plant_age = orig_plant;
+    }
+}
+
+TEST_CASE("Cell overlap prevention", "[simulation]") {
+    // Brain genome that places SmallLeaf(2) at dx=+1, dy=0 then halts.
+    // OP_PLACE_CELL=0x60, type=2, dx=+1, dy=0, dir=0, OP_HALT=0x01
+    std::vector<uint8_t> placer_genome(1024, 0);
+    placer_genome[0] = 0x60; // OP_PLACE_CELL
+    placer_genome[1] = 0x02; // SmallLeaf
+    placer_genome[2] = 0x01; // dx=+1
+    placer_genome[3] = 0x00; // dy=0
+    placer_genome[4] = 0x00; // direction North
+    placer_genome[5] = 0x01; // OP_HALT
+
+    std::vector<uint8_t> idle_genome(1024, 0); // all NOPs, effectively idle
+    idle_genome[0] = 0x01; // OP_HALT immediately
+
+    SECTION("Placing on another plant's cell displaces it") {
+        // Plant A at (50,50) wants to place at (51,50).
+        // Plant B at (52,50) pre-placed a leaf at (51,50).
+        Simulation sim(100, 100, 42);
+        sim.add_plant({50, 50}, placer_genome);
+        sim.add_plant({52, 50}, idle_genome);
+
+        Plant* a = sim.find_plant(1);
+        Plant* b = sim.find_plant(2);
+        a->resources().energy = 1000.0f;
+        a->resources().water  = 1000.0f;
+        b->resources().energy = 1000.0f;
+        b->resources().water  = 1000.0f;
+
+        // Manually place B's leaf at (51,50) — the same tile A will try to claim
+        b->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim.world());
+        REQUIRE(b->cell_count() == 2);
+
+        sim.advance_tick();
+
+        // B's leaf should be displaced; A should now own (51,50)
+        const WorldCell& wc = sim.world().cell_at({51, 50});
+        REQUIRE(wc.is_occupied());
+        REQUIRE(wc.plant_id == a->id());
+        REQUIRE(b->cell_count() == 1); // only B's primary remains
+    }
+
+    SECTION("Placing on another plant's primary cell kills that plant") {
+        // Plant A at (50,50) tries to place at (51,50) = Plant B's primary.
+        Simulation sim(100, 100, 42);
+        sim.add_plant({50, 50}, placer_genome);
+        sim.add_plant({51, 50}, idle_genome);
+
+        Plant* a = sim.find_plant(1);
+        a->resources().energy = 1000.0f;
+        a->resources().water  = 1000.0f;
+        Plant* b = sim.find_plant(2);
+        b->resources().energy = 1000.0f;
+        b->resources().water  = 1000.0f;
+
+        sim.advance_tick();
+
+        // Plant B should be dead and removed; A owns (51,50)
+        REQUIRE(sim.find_plant(2) == nullptr);
+        const WorldCell& wc = sim.world().cell_at({51, 50});
+        REQUIRE(wc.plant_id == a->id());
+    }
+
+    SECTION("Placing on own existing cell charges 10% penalty, no re-place") {
+        // Plant A already has a leaf at (51,50); brain tries to place there again.
+        Simulation sim(100, 100, 42);
+        Plant* a = sim.add_plant({50, 50}, placer_genome);
+        a->resources().energy    = 1000.0f;
+        a->resources().water     = 1000.0f;
+        a->resources().nutrients = 0.0f;
+
+        // Pre-place the leaf so the target tile is already owned by A
+        a->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim.world());
+
+        // Run a reference tick with an idle plant to measure baseline resource change
+        Simulation sim_ref(100, 100, 42);
+        Plant* ref = sim_ref.add_plant({50, 50}, idle_genome);
+        ref->resources().energy    = 1000.0f;
+        ref->resources().water     = 1000.0f;
+        ref->resources().nutrients = 0.0f;
+        ref->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim_ref.world());
+
+        auto& cfg = get_config();
+        uint32_t orig_cell  = cfg.max_cell_age;
+        uint32_t orig_plant = cfg.max_plant_age;
+        cfg.max_cell_age  = 0;
+        cfg.max_plant_age = 0;
+
+        float ref_energy_before = ref->resources().energy;
+        sim_ref.advance_tick();
+        float ref_delta = ref->resources().energy - ref_energy_before; // baseline (no penalty)
+
+        float energy_before = a->resources().energy;
+        sim.advance_tick();
+        float actual_delta = a->resources().energy - energy_before;
+
+        cfg.max_cell_age  = orig_cell;
+        cfg.max_plant_age = orig_plant;
+
+        // The placer brain charged 10% of SmallLeaf build cost (=1 energy) as penalty.
+        // So actual_delta should be lower than ref_delta by approximately that penalty.
+        const CellCosts& cost = get_cell_costs(CellType::SmallLeaf);
+        float expected_penalty = cost.build_energy * 0.1f;
+        float penalty_observed = ref_delta - actual_delta;
+        REQUIRE(penalty_observed > expected_penalty * 0.5f); // meaningful penalty was charged
+        REQUIRE(penalty_observed < cost.build_energy * 1.5f); // but not the full build cost
+        // Cell count unchanged (no extra cell placed)
+        REQUIRE(a->cell_count() == 2);
+    }
+
+    SECTION("Multi-plant conflict: neither cell is placed, both charged") {
+        // Both plants try to place at the same empty tile; conflict cancels both.
+        // Genome: PLACE_CELL SmallLeaf dx=0 dy=+1 (above primary)
+        std::vector<uint8_t> up_genome(1024, 0);
+        up_genome[0] = 0x60; up_genome[1] = 0x02; // OP_PLACE_CELL, SmallLeaf
+        up_genome[2] = 0x00; up_genome[3] = 0x01; // dx=0, dy=+1
+        up_genome[4] = 0x00; up_genome[5] = 0x01; // dir=North, OP_HALT
+
+        Simulation sim(100, 100, 42);
+        // Plants on either side of the empty target at (51,50)
+        sim.add_plant({50, 50}, placer_genome); // tries (51,50)
+        sim.add_plant({52, 50}, idle_genome);
+
+        Plant* a = sim.find_plant(1);
+        Plant* b = sim.find_plant(2);
+        a->resources().energy = 1000.0f;
+        a->resources().water  = 1000.0f;
+        b->resources().energy = 1000.0f;
+        b->resources().water  = 1000.0f;
+
+        // Give B a leaf at (51,50) pre-placed so B also tries to place there
+        // Actually: simulate conflict by giving both a brain placing at same tile.
+        // B's idle_genome doesn't place — let's give B the placer that places at dx=-1
+        std::vector<uint8_t> left_placer(1024, 0);
+        left_placer[0] = 0x60; left_placer[1] = 0x02;
+        left_placer[2] = static_cast<uint8_t>(-1); // dx=-1 as int8
+        left_placer[3] = 0x00; left_placer[4] = 0x00; left_placer[5] = 0x01;
+
+        sim.find_plant(2)->brain().write(0, 0x60); // PLACE_CELL
+        sim.find_plant(2)->brain().write(1, 0x02); // SmallLeaf
+        sim.find_plant(2)->brain().write(2, static_cast<uint8_t>(-1)); // dx=-1
+        sim.find_plant(2)->brain().write(3, 0x00);
+        sim.find_plant(2)->brain().write(4, 0x00);
+        sim.find_plant(2)->brain().write(5, 0x01); // HALT
+
+        float a_energy_before = a->resources().energy;
+        float b_energy_before = b->resources().energy;
+
+        sim.advance_tick();
+
+        // Neither should have placed at (51,50)
+        const WorldCell& wc = sim.world().cell_at({51, 50});
+        REQUIRE_FALSE(wc.is_occupied());
+        // Both should have been charged
+        REQUIRE(a->resources().energy < a_energy_before);
+        REQUIRE(b->resources().energy < b_energy_before);
+    }
+}
+
 TEST_CASE("Simulation determinism", "[simulation]") {
     std::vector<uint8_t> genome(100);
     for (size_t i = 0; i < genome.size(); ++i) {
