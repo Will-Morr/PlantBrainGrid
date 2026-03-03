@@ -17,12 +17,12 @@ struct Config {
     // World
     uint32_t world_width = 512;
     uint32_t world_height = 512;
-    float water_perlin_scale = 0.08f;
-    float nutrient_perlin_scale = 0.03f;
-    float water_base = 50.0f;
-    float water_amplitude = 40.0f;
-    float nutrient_base = 30.0f;
-    float nutrient_amplitude = 25.0f;
+    float water_perlin_scale = 0.03f;
+    float nutrient_perlin_scale = 0.02f;
+    float water_base = 1.0f;
+    float water_amplitude = 2.0f;
+    float nutrient_base = 1.0f;
+    float nutrient_amplitude = 2.0f;
 
     // Plants
     uint16_t brain_size = 1024;
@@ -47,16 +47,16 @@ struct Config {
     // Cell costs (build and maintenance per cell type)
     //                                    build                  maintain
     //                              energy  water  nutrients  energy  water  nutrients
-    CellCosts primary_costs         = { 0,    0,    0,        0.1f,  0,     0     };
-    CellCosts small_leaf_costs      = { 10,   0,    0,        0,     0.2f,  0     };
-    CellCosts big_leaf_costs        = { 25,   0,    10,       0,     1.0f,  0.3f  };
-    CellCosts fiber_root_costs      = { 8,    0,    0,        0.1f,  0,     0     };
-    CellCosts tap_root_costs        = { 12,   0,    0,        0.15f, 0,     0     };
-    CellCosts xylem_costs           = { 12,   0,    0,        0.05f, 0,     0     };
-    CellCosts fireproof_xylem_costs = { 15,   0,    20,       0.05f, 0,     0     };
-    CellCosts thorn_costs           = { 15,   0,    0,        0.1f,  0,     0     };
-    CellCosts fire_starter_costs    = { 30,   0,    0,        0,     0,     0     };
-
+    CellCosts primary_costs         = { 50,  0,   0,   0.1,   0,    0   };
+    CellCosts small_leaf_costs      = { 10,  0,   0,   0,     0.2,  0   };
+    CellCosts big_leaf_costs        = { 25,  0,   10,  0,     1,    0.3 };
+    CellCosts fiber_root_costs      = { 8,   0,   0,   0.2,   0,    0   };
+    CellCosts tap_root_costs        = { 12,  0,   0,   0.2,   0,    0   };
+    CellCosts xylem_costs           = { 12,  0,   0,   0.05,  0,    0   };
+    CellCosts fireproof_xylem_costs = { 5,   0,   20,  0.05,  0,    0   };
+    CellCosts thorn_costs           = { 15,  0,   0,   0.05,  0,    0   };
+    CellCosts fire_starter_costs    = { 30,  0,   0,   0,     0,    0   };
+    
     // Reproduction
     float mutation_rate = 0.01f;
     uint8_t mutation_magnitude = 16;
@@ -66,14 +66,14 @@ struct Config {
     float seed_launch_distance_per_energy = 2.0f;
 
     // Fire
-    uint16_t fire_spread_ticks = 10;
+    uint16_t fire_spread_ticks = 6;
     uint16_t fire_destroy_ticks = 12;
-    float fire_water_threshold = 99999.0f;
+    float fire_water_threshold = 999.9f;
 
     // Seasons
     uint32_t season_length = 1000;
     float base_light = 1.0f;
-    float light_amplitude = 0.1f;
+    float light_amplitude = 1.0f;
 
     // Scaling for brain sensing (convert float resources to 0-255 byte)
     float resource_sense_scale = 2.55f;  // 100 resource = 255 byte value

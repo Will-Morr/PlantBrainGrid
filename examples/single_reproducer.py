@@ -72,7 +72,7 @@ def _build_sim(width, height, seed):
     # plant.resources().water     = 100.0
     # plant.resources().nutrients = 100.0
 
-    sim.enable_auto_spawn(True, min_population=10, energy=200.0, water=100.0, nutrients=30.0)
+    sim.enable_auto_spawn(True, min_population=50, energy=200.0, water=100.0, nutrients=30.0)
 
     return sim, genome_path, len(genome), None
 

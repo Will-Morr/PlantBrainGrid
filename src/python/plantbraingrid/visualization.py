@@ -271,12 +271,12 @@ class Visualizer:
                 cell = world.cell_at(x, y)
 
                 if self.show_water and cell.water_level > 0:
-                    alpha = min(200, int(cell.water_level * 2))
+                    alpha = int(cell.water_level * 100)
                     rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
                                       rl.Color(0, 100, 200, alpha))
 
                 if self.show_nutrients and cell.nutrient_level > 0:
-                    alpha = min(200, int(cell.nutrient_level * 3))
+                    alpha = int(cell.nutrient_level * 100)
                     rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
                                       rl.Color(139, 69, 19, alpha))
 

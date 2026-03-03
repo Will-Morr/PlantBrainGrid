@@ -23,7 +23,7 @@ ResourceTickResult ResourceSystem::process_tick(Plant& plant, World& world) {
     const auto& cfg_tick = get_config();
     if (world.in_bounds(plant.primary_position())) {
         WorldCell& pwc = world.cell_at(plant.primary_position());
-        result.water_extracted += std::min(pwc.water_level, cfg_tick.primary_water_rate);
+        result.water_extracted += pwc.water_level*cfg_tick.primary_water_rate;
     }
 
     // 2. Add generated resources to plant pool
@@ -87,12 +87,12 @@ float ResourceSystem::calculate_root_water(const Plant& plant, World& world) {
         if (cell.type == CellType::FiberRoot) {
             if (world.in_bounds(cell.position)) {
                 WorldCell& wc = world.cell_at(cell.position);
-                total_water += std::min(wc.water_level, cfg.fiber_root_water_rate);
+                total_water += wc.water_level*cfg.fiber_root_water_rate;
             }
         } else if (cell.type == CellType::TapRoot) {
             if (world.in_bounds(cell.position)) {
                 WorldCell& wc = world.cell_at(cell.position);
-                total_water += std::min(wc.water_level, cfg.tap_root_water_rate);
+                total_water += wc.water_level*cfg.tap_root_water_rate;
             }
         }
     }
@@ -110,7 +110,7 @@ float ResourceSystem::calculate_root_nutrients(const Plant& plant, World& world)
 
         if (world.in_bounds(cell.position)) {
             WorldCell& wc = world.cell_at(cell.position);
-            float extract = std::min(wc.nutrient_level, cfg.fiber_root_nutrient_rate);
+            float extract = wc.nutrient_level*cfg.fiber_root_nutrient_rate;
             total_nutrients += extract;
         }
     }
