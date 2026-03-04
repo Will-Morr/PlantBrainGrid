@@ -271,12 +271,12 @@ class Visualizer:
                 cell = world.cell_at(x, y)
 
                 if self.show_water and cell.water_level > 0:
-                    alpha = int(cell.water_level * 100)
+                    alpha = min(int(cell.water_level * 100), 255)
                     rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
                                       rl.Color(0, 100, 200, alpha))
 
                 if self.show_nutrients and cell.nutrient_level > 0:
-                    alpha = int(cell.nutrient_level * 100)
+                    alpha = min(int(cell.nutrient_level * 100), 255)
                     rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
                                       rl.Color(139, 69, 19, alpha))
 
@@ -291,7 +291,7 @@ class Visualizer:
                 for cell in plant.cells():
                     sx, sy = self.camera.world_to_screen(cell.position.x, cell.position.y)
 
-                    color = CELL_COLORS.get(int(cell.type), (255, 0, 255))
+                    color = CELL_COLORS.get(int(cell.type), (255, 0, 240))
                     if not cell.enabled:
                         color = tuple(c // 2 for c in color)
 
@@ -300,7 +300,7 @@ class Visualizer:
 
                     if is_selected:
                         rl.draw_rectangle_lines(int(sx), int(sy), cell_px, cell_px,
-                                                rl.Color(255, 255, 0, 255))
+                                                rl.Color(255, 255, 0, 240))
 
         # Draw fire overlay on top of plant cells
         if self.show_fire:
