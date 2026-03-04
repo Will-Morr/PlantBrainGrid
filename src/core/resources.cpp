@@ -48,9 +48,6 @@ ResourceTickResult ResourceSystem::process_tick(Plant& plant, World& world) {
     plant.resources().water -= maintenance.water;
     plant.resources().nutrients -= maintenance.nutrients;
 
-    // 5. Clamp to non-negative
-    plant.resources().clamp_non_negative();
-
     // Calculate net changes
     result.net_energy = result.energy_generated - result.energy_maintenance;
     result.net_water = result.water_extracted - result.water_maintenance;
