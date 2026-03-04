@@ -24,6 +24,53 @@ err()   { echo -e "${RED}[ERR ]${RESET}  $*" >&2; }
 die()   { err "$*"; exit 1; }
 step()  { echo -e "\n${BOLD}━━━  $*  ━━━${RESET}"; }
 
+# ─── Incremental build helpers ────────────────────────────────────────────────
+# run_cmake_if_needed STAMP ARGS...
+#   Runs cmake ARGS only when needed:
+#     - build/CMakeCache.txt is missing
+#     - STAMP is missing or its stored args-hash differs from current args
+#     - Any CMakeLists.txt or .cmake file is newer than STAMP
+#   On success, writes the args-hash to STAMP.
+run_cmake_if_needed() {
+    local stamp="$1"; shift
+    local args_hash
+    args_hash=$(printf '%s\0' "$@" | md5sum | cut -d' ' -f1)
+
+    local need=0
+    [[ ! -f "$SCRIPT_DIR/build/CMakeCache.txt" ]] && need=1
+    [[ $need -eq 0 && ! -f "$stamp" ]]            && need=1
+    [[ $need -eq 0 && "$(cat "$stamp" 2>/dev/null)" != "$args_hash" ]] && need=1
+
+    if [[ $need -eq 0 ]]; then
+        while IFS= read -r f; do
+            if [[ "$f" -nt "$stamp" ]]; then need=1; break; fi
+        done < <(find "$SCRIPT_DIR" \
+                     \( -name "CMakeLists.txt" -o -name "*.cmake" \) \
+                     -not -path "$SCRIPT_DIR/build/*" 2>/dev/null)
+    fi
+
+    if [[ $need -eq 0 ]]; then
+        info "cmake configuration unchanged — skipping reconfigure"
+        return 0
+    fi
+
+    cmake "$@" 2>&1 | grep -E "^(-- |CMake|Error|fatal)" || true
+    [[ ${PIPESTATUS[0]} -eq 0 ]] || { err "cmake failed"; return 1; }
+    echo "$args_hash" > "$stamp"
+}
+
+# pip_ensure PKG...
+#   Installs each pip package only if not already present in the venv.
+pip_ensure() {
+    local to_install=()
+    for pkg in "$@"; do
+        "$PIP" show "$pkg" >/dev/null 2>&1 || to_install+=("$pkg")
+    done
+    [[ ${#to_install[@]} -eq 0 ]] && return 0
+    "$PIP" install --quiet "${to_install[@]}"
+    ok "pip installed: ${to_install[*]}"
+}
+
 # ─── Flags ───────────────────────────────────────────────────────────────────
 SKIP_PYTHON=0
 RUN_TESTS=0
@@ -53,6 +100,9 @@ if [[ $CLEAN -eq 1 ]]; then
     ok "Clean complete"
 fi
 
+STAMP_CPP="$SCRIPT_DIR/build/.stamp_cpp"
+STAMP_PYTHON="$SCRIPT_DIR/build/.stamp_python"
+
 # ─── 1. Prerequisites ─────────────────────────────────────────────────────────
 step "Checking prerequisites"
 
@@ -77,12 +127,11 @@ step "Building C++ core"
 mkdir -p "$SCRIPT_DIR/build"
 cd "$SCRIPT_DIR/build"
 
-cmake .. \
+run_cmake_if_needed "$STAMP_CPP" .. \
     -DCMAKE_BUILD_TYPE=Debug \
     -DBUILD_PYTHON_BINDINGS=OFF \
     -DBUILD_TESTS="$( [[ $RUN_TESTS -eq 1 ]] && echo ON || echo OFF )" \
-    -Wno-dev \
-    2>&1 | grep -E "^(-- |CMake|Error|fatal)" || true
+    -Wno-dev
 
 if [[ $RUN_TESTS -eq 1 ]]; then
     make -j"$(nproc)" plantbraingrid_core plantbraingrid_tests
@@ -114,12 +163,10 @@ fi
 
 PIP="$VENV/bin/pip"
 "$PIP" install --quiet --upgrade pip
-"$PIP" install --quiet pybind11 pytest
-ok "pip packages: pybind11, pytest"
+pip_ensure pybind11 pytest
 
 if [[ $INSTALL_RAYLIB -eq 1 ]]; then
-    "$PIP" install --quiet raylib
-    ok "pip packages: raylib"
+    pip_ensure raylib
 fi
 
 # ─── 4. Python development headers ───────────────────────────────────────────
@@ -220,21 +267,20 @@ step "Building Python bindings (_plantbraingrid)"
 mkdir -p "$SCRIPT_DIR/build"
 cd "$SCRIPT_DIR/build"
 
-cmake .. \
+run_cmake_if_needed "$STAMP_PYTHON" .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_PYTHON_BINDINGS=ON \
     -DBUILD_TESTS=OFF \
     "${CMAKE_PY_ARGS[@]}" \
-    -Wno-dev \
-    2>&1 | grep -E "^(-- |CMake|Error|fatal)" || true
+    -Wno-dev
 
 make -j"$(nproc)" _plantbraingrid
 
 SO_FILE=$(find . -name "_plantbraingrid*.so" -maxdepth 2 | head -1)
 [[ -n "$SO_FILE" ]] || die "Build succeeded but _plantbraingrid*.so not found"
 
-cp "$SO_FILE" "$SCRIPT_DIR/src/python/plantbraingrid/"
-cp "$SO_FILE" "$SCRIPT_DIR/"
+cp -u "$SO_FILE" "$SCRIPT_DIR/src/python/plantbraingrid/"
+cp -u "$SO_FILE" "$SCRIPT_DIR/"
 ok "Installed: $(basename "$SO_FILE")"
 
 cd "$SCRIPT_DIR"

@@ -18,7 +18,7 @@ endif()
 find_package(Threads REQUIRED)
 
 # Core library
-file(GLOB_RECURSE CORE_SOURCES "src/core/*.cpp")
+file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS "src/core/*.cpp")
 add_library(plantbraingrid_core STATIC ${CORE_SOURCES})
 set_target_properties(plantbraingrid_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(plantbraingrid_core PUBLIC
@@ -72,7 +72,7 @@ if(BUILD_TESTS)
     FetchContent_MakeAvailable(Catch2)
 
     # Test executable
-    file(GLOB_RECURSE TEST_SOURCES "tests/cpp/*.cpp")
+    file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS "tests/cpp/*.cpp")
     add_executable(plantbraingrid_tests ${TEST_SOURCES})
     target_link_libraries(plantbraingrid_tests PRIVATE
         plantbraingrid_core
