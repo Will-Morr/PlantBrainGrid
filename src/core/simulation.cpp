@@ -307,7 +307,7 @@ void Simulation::process_resources() {
 void Simulation::check_starvation() {
     for (auto& plant : plants_) {
         if (!plant.is_alive()) continue;
-        if (plant.resources().energy <= 0.0f || plant.resources().water <= 0.0f) {
+        if (plant.resources().energy < 0.0f || plant.resources().water < 0.0f || plant.resources().nutrients < 0.0f) {
             plant.kill();
         }
     }
