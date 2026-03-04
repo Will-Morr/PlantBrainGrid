@@ -45,7 +45,7 @@ def _find_latest_backup(backup_dir="sim_backup"):
     return os.path.join(backup_dir, entries[0]) if entries else None
 
 
-def _build_sim(width, height, seed):
+def _build_sim(width, height, seed, is_random=False):
     """Create the simulation and seed it with 20 random-genome plants at the centre.
 
     If a backup exists in sim_backup/, the most recent one is loaded instead of
@@ -62,23 +62,26 @@ def _build_sim(width, height, seed):
     rng = random.Random(seed)
     sim = Simulation(width, height, seed)
 
-    cx, cy = width // 2, height // 2
     n_placed = 0
-    for i in range(-10, 10):
-        genome = [rng.randint(0, 255) for _ in range(1024)]
-        plant = sim.add_plant(GridCoord(cx + i * 3, cy), genome)
-        if plant is None:
-            continue
-        plant.resources().energy    = 20000.0
-        plant.resources().water     = 1000.0
-        plant.resources().nutrients = 1000.0
-        n_placed += 1
+    if not is_random:
+        genome_path = os.path.join(os.path.dirname(__file__), 'reproducer.bin')
+        genome = list(open(genome_path, 'rb').read())
+
+        cx, cy = width // 2, height // 2
+        for i in range(-10, 10):
+            plant = sim.add_plant(GridCoord(cx + i * 3, cy), genome)
+            plant.resources().energy    = 20000.0
+            plant.resources().water     = 1000.0
+            plant.resources().nutrients = 1000.0
+            n_placed += 1
+    else:
+        sim.enable_auto_spawn(True, min_population=50, energy=200.0, water=100.0, nutrients=30.0)
 
     return sim, n_placed, None
 
 
-def run_headless(width, height, seed, ticks, backup_every_nth=10000):
-    sim, n_plants, resumed_from = _build_sim(width, height, seed)
+def run_headless(width, height, seed, ticks, backup_every_nth=10000, is_random=False):
+    sim, n_plants, resumed_from = _build_sim(width, height, seed, is_random)
     cx, cy = width // 2, height // 2
 
     print(f"World:  {width}x{height}  seed={seed}")
@@ -112,7 +115,7 @@ def run_headless(width, height, seed, ticks, backup_every_nth=10000):
     print(f"Done — {final} plant{'s' if final != 1 else ''} alive after {ticks} ticks.")
 
 
-def run_visual(width, height, seed, fullscreen=False, backup_every_nth=10000, ticks_per_frame=50):
+def run_visual(width, height, seed, fullscreen=False, backup_every_nth=10000, ticks_per_frame=50, is_random=False):
     try:
         import pyray as rl
         from plantbraingrid.visualization import Visualizer
@@ -122,7 +125,7 @@ def run_visual(width, height, seed, fullscreen=False, backup_every_nth=10000, ti
                      backup_every_nth=backup_every_nth)
         return
 
-    sim, n_plants, resumed_from = _build_sim(width, height, seed)
+    sim, n_plants, resumed_from = _build_sim(width, height, seed, is_random)
     cx, cy = width // 2, height // 2
 
     print(f"World:  {width}x{height}  seed={seed}")
@@ -206,16 +209,19 @@ def main():
     parser.add_argument('--ticks-per-frame', type=int, default=50,
                         dest='ticks_per_frame',
                         help='Simulation ticks advanced per rendered frame (default: 50)')
+    parser.add_argument('--random-plants',     type=bool, default=False, dest='random_plants')    
     args = parser.parse_args()
 
     if args.headless:
         run_headless(args.width, args.height, args.seed, args.ticks,
-                     backup_every_nth=args.backup_every_nth)
+                     backup_every_nth=args.backup_every_nth,
+                     is_random=args.random_plants)
     else:
         run_visual(args.width, args.height, args.seed,
                    fullscreen=args.fullscreen,
                    backup_every_nth=args.backup_every_nth,
-                   ticks_per_frame=args.ticks_per_frame)
+                   ticks_per_frame=args.ticks_per_frame,
+                   is_random=args.random_plants)
 
 
 if __name__ == '__main__':
