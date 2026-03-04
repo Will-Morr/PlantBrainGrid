@@ -223,15 +223,17 @@ std::optional<Seed> ReproductionSystem::create_seed(
     float nutrient_cost = static_cast<float>(params.nutrients) / cfg.resource_sense_scale;
     float launch_cost = static_cast<float>(params.launch_power);
 
-    // Check if mother can afford it
-    if (mother.resources().energy < energy_cost + launch_cost ||
-        mother.resources().water < water_cost ||
-        mother.resources().nutrients < nutrient_cost) {
-        return std::nullopt;
-    }
+    // Reduce cost father can't afford full launch
+    launch_cost = std::min(launch_cost, mother.resources().energy);
+    mother.resources().energy -= launch_cost;
+
+    // Reduce cost if mother can't afford full resource allocation
+    energy_cost = std::min(energy_cost, mother.resources().energy);
+    water_cost = std::min(water_cost, mother.resources().water);
+    nutrient_cost = std::min(nutrient_cost, mother.resources().nutrients);
 
     // Deduct resources from mother
-    mother.resources().energy -= energy_cost + launch_cost;
+    mother.resources().energy -= energy_cost;
     mother.resources().water -= water_cost;
     mother.resources().nutrients -= nutrient_cost;
 
