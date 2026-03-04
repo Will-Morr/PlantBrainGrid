@@ -62,17 +62,18 @@ def _build_sim(width, height, seed):
 
     sim = Simulation(width, height, seed)
 
-    # cx, cy = width // 2, height // 2
-    # plant = sim.add_plant(GridCoord(cx, cy), genome)
-    # if plant is None:
-    #     print("Failed to place initial plant — position occupied?")
-    #     sys.exit(1)
+    cx, cy = width // 2, height // 2
+    for i in range(-10, 10):
+        plant = sim.add_plant(GridCoord(cx+i*3, cy), genome)
+        if plant is None:
+            print("Failed to place initial plant — position occupied?")
+            sys.exit(1)
 
-    # plant.resources().energy    = 200.0
-    # plant.resources().water     = 100.0
-    # plant.resources().nutrients = 100.0
+        plant.resources().energy    = 20000.0
+        plant.resources().water     = 1000.0
+        plant.resources().nutrients = 1000.0
 
-    sim.enable_auto_spawn(True, min_population=50, energy=200.0, water=100.0, nutrients=30.0)
+    # sim.enable_auto_spawn(True, min_population=50, energy=200.0, water=100.0, nutrients=30.0)
 
     return sim, genome_path, len(genome), None
 
@@ -140,12 +141,12 @@ def run_visual(width, height, seed, fullscreen=False):
 
     vis.paused = True
 
+    backup_every_nth = 10000
     ticks_per_frame = 50
     report_every = ticks_per_frame
 
     tick = sim.tick()-1
 
-    backup_every_nth = 1000
     os.makedirs("sim_backup", exist_ok=True)
 
     while not vis.should_close():
