@@ -78,7 +78,7 @@ main:
     HALT
 
     PLACE_CELL SmallLeaf, +0, -1
-    PLACE_CELL FiberRoot, +0, +1
+    ; PLACE_CELL TapRoot, +0, +1
     HALT
     HALT
     HALT

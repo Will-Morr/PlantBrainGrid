@@ -65,6 +65,11 @@ void World::initialize_terrain() {
                 cfg.water_base,
                 cfg.water_amplitude
             );
+            
+            // Set minimum water level
+            if (cell.water_level < cfg.water_min) {
+                cell.water_level = cfg.water_min;
+            }
 
             cell.nutrient_level = nutrient_perlin_.scaled_noise(
                 static_cast<float>(x),

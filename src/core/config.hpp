@@ -17,10 +17,11 @@ struct Config {
     // World
     uint32_t world_width = 512;
     uint32_t world_height = 512;
-    float water_perlin_scale = 0.03f;
-    float nutrient_perlin_scale = 0.02f;
-    float water_base = 1.0f;
+    float water_perlin_scale = 0.02f;
+    float nutrient_perlin_scale = 0.015f;
+    float water_base = 0.8f;
     float water_amplitude = 2.0f;
+    float water_min = 0.15f;
     float nutrient_base = 1.0f;
     float nutrient_amplitude = 2.0f;
 
@@ -47,14 +48,14 @@ struct Config {
     // Cell costs (build and maintenance per cell type)
     //                                    build                  maintain
     //                              energy  water  nutrients  energy  water  nutrients
-    CellCosts primary_costs         = { 50,  0,   0,   0.1,   0,    0   };
+    CellCosts primary_costs         = { 10,  0,   0,   0.1,   0,    0   };
     CellCosts small_leaf_costs      = { 10,  0,   0,   0,     0.2,  0   };
     CellCosts big_leaf_costs        = { 25,  0,   10,  0,     1,    0.3 };
     CellCosts fiber_root_costs      = { 8,   0,   0,   0.2,   0,    0   };
-    CellCosts tap_root_costs        = { 12,  0,   0,   0.2,   0,    0   };
+    CellCosts tap_root_costs        = { 12,  0,   0,   0.1,   0,    0   };
     CellCosts xylem_costs           = { 12,  0,   0,   0.05,  0,    0   };
     CellCosts fireproof_xylem_costs = { 5,   0,   20,  0.05,  0,    0   };
-    CellCosts thorn_costs           = { 15,  0,   0,   0.05,  0,    0   };
+    CellCosts thorn_costs           = { 5,   0,   0,   0,     0.01, 0   };
     CellCosts fire_starter_costs    = { 30,  0,   0,   0,     0,    0   };
     
     // Reproduction
@@ -73,12 +74,12 @@ struct Config {
 
     // Old age
     uint32_t max_cell_age = 1000;   // ticks before a cell dies of old age (0 = disabled)
-    uint32_t max_plant_age = 10000; // ticks before a plant dies of old age (0 = disabled)
+    uint32_t max_plant_age = 5000; // ticks before a plant dies of old age (0 = disabled)
 
     // Seasons
-    uint32_t season_length = 1000;
+    uint32_t season_length = 500;
     float base_light = 1.0f;
-    float light_amplitude = 1.0f;
+    float light_amplitude = 0.75f;
 
     // Scaling for brain sensing (convert float resources to 0-255 byte)
     float resource_sense_scale = 2.55f;  // 100 resource = 255 byte value
