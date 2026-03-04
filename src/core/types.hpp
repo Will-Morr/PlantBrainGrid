@@ -48,27 +48,6 @@ struct Vec2 {
     Vec2 normalized() const;
 };
 
-enum class Direction : uint8_t {
-    North = 0,
-    East = 1,
-    South = 2,
-    West = 3
-};
-
-inline GridCoord direction_offset(Direction dir) {
-    switch (dir) {
-        case Direction::North: return {0, -1};
-        case Direction::East:  return {1, 0};
-        case Direction::South: return {0, 1};
-        case Direction::West:  return {-1, 0};
-    }
-    return {0, 0};
-}
-
-inline Direction direction_from_byte(uint8_t byte) {
-    return static_cast<Direction>(byte % 4);
-}
-
 enum class CellType : uint8_t {
     Empty = 0,
     Primary = 1,

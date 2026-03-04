@@ -36,8 +36,7 @@ static std::vector<uint8_t> make_placer_genome(size_t size = 256) {
     g[1] = static_cast<uint8_t>(CellType::SmallLeaf);
     g[2] = 1;   // dx = +1
     g[3] = 0;   // dy = 0
-    g[4] = 0;   // direction North
-    g[5] = OP_HALT;
+    g[4] = OP_HALT;
     return g;
 }
 
@@ -363,14 +362,14 @@ TEST_CASE("TapRoot water extraction", "[parallel][resources]") {
         world.cell_at({10, 25}).plant_id = pa.id();
         world.cell_at({10, 25}).water_level = 100.f;
         world.cell_at({11, 25}).water_level = 100.f;
-        pa.place_cell(CellType::FiberRoot, {11, 25}, Direction::North, world);
+        pa.place_cell(CellType::FiberRoot, {11, 25}, world);
 
         Plant pb(2, {20, 25}, genome);
         pb.resources() = Resources{500.f, 500.f, 100.f};
         world.cell_at({20, 25}).plant_id = pb.id();
         world.cell_at({20, 25}).water_level = 100.f;
         world.cell_at({21, 25}).water_level = 100.f;
-        pb.place_cell(CellType::TapRoot, {21, 25}, Direction::North, world);
+        pb.place_cell(CellType::TapRoot, {21, 25}, world);
 
         float water_fiber = ResourceSystem::calculate_root_water(pa, world);
         float water_tap   = ResourceSystem::calculate_root_water(pb, world);
@@ -389,7 +388,7 @@ TEST_CASE("TapRoot water extraction", "[parallel][resources]") {
         world.cell_at({30, 25}).plant_id = p.id();
         world.cell_at({31, 25}).nutrient_level = 100.f;
         world.cell_at({31, 25}).water_level = 100.f;
-        p.place_cell(CellType::TapRoot, {31, 25}, Direction::North, world);
+        p.place_cell(CellType::TapRoot, {31, 25}, world);
 
         float nutrients = ResourceSystem::calculate_root_nutrients(p, world);
         REQUIRE(nutrients == 0.0f);
@@ -403,7 +402,7 @@ TEST_CASE("TapRoot water extraction", "[parallel][resources]") {
         world.cell_at({40, 25}).plant_id = p.id();
         world.cell_at({41, 25}).water_level = 100.f;
         world.cell_at({41, 25}).nutrient_level = 100.f;
-        p.place_cell(CellType::FiberRoot, {41, 25}, Direction::North, world);
+        p.place_cell(CellType::FiberRoot, {41, 25}, world);
 
         float water     = ResourceSystem::calculate_root_water(p, world);
         float nutrients = ResourceSystem::calculate_root_nutrients(p, world);

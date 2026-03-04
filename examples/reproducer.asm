@@ -58,10 +58,10 @@ main:
     JUMP_IF_NEQ [GROWN], 0, reproduce
 
     ; --- Growth phase (only when count < 5) ---
-    PLACE_CELL FiberRoot, +0, +1, North
-    PLACE_CELL SmallLeaf, +0, -1, North
-    PLACE_CELL SmallLeaf, +1,  0, North
-    PLACE_CELL SmallLeaf, -1,  0, North
+    PLACE_CELL FiberRoot, +0, +1
+    PLACE_CELL SmallLeaf, +0, -1
+    PLACE_CELL SmallLeaf, +1,  0
+    PLACE_CELL SmallLeaf, -1,  0
 
 reproduce:
     ; --- Reproduction check ---

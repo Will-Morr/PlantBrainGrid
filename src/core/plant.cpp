@@ -100,8 +100,8 @@ bool Plant::place_cell_shape_ok(CellType type, const GridCoord& pos, const World
     return true;
 }
 
-void Plant::do_place_cell_internal(CellType type, const GridCoord& pos, Direction dir, World& world) {
-    PlantCell cell(type, pos, dir);
+void Plant::do_place_cell_internal(CellType type, const GridCoord& pos, World& world) {
+    PlantCell cell(type, pos);
     cell.plant_id = id_;
     add_cell_internal(cell);
     WorldCell& placed_wc = world.cell_at(pos);
@@ -124,17 +124,17 @@ bool Plant::can_place_cell(CellType type, const GridCoord& pos, const World& wor
            resources_.nutrients >= cost.build_nutrients;
 }
 
-bool Plant::place_cell(CellType type, const GridCoord& pos, Direction dir, World& world) {
+bool Plant::place_cell(CellType type, const GridCoord& pos, World& world) {
     if (!can_place_cell(type, pos, world)) return false;
     const CellCosts& cost = get_cell_costs(type);
     if (!pay_cost(cost)) return false;
-    do_place_cell_internal(type, pos, dir, world);
+    do_place_cell_internal(type, pos, world);
     return true;
 }
 
-bool Plant::place_cell_free(CellType type, const GridCoord& pos, Direction dir, World& world) {
+bool Plant::place_cell_free(CellType type, const GridCoord& pos, World& world) {
     if (!place_cell_shape_ok(type, pos, world)) return false;
-    do_place_cell_internal(type, pos, dir, world);
+    do_place_cell_internal(type, pos, world);
     return true;
 }
 
@@ -172,23 +172,6 @@ bool Plant::toggle_cell(const GridCoord& pos, bool enabled) {
     if (!cell) return false;
 
     cell->enabled = enabled;
-    return true;
-}
-
-bool Plant::rotate_cell(const GridCoord& pos, int rotation) {
-    if (!alive_) return false;
-
-    PlantCell* cell = find_cell(pos);
-    if (!cell) return false;
-
-    // Only xylem cells have meaningful direction
-    if (!cell->is_xylem()) return false;
-
-    int current = static_cast<int>(cell->direction);
-    int new_dir = (current + rotation) % 4;
-    if (new_dir < 0) new_dir += 4;
-    cell->direction = static_cast<Direction>(new_dir);
-
     return true;
 }
 

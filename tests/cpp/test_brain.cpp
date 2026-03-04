@@ -290,8 +290,7 @@ TEST_CASE("Brain action queueing", "[brain]") {
         genome[1] = static_cast<uint8_t>(CellType::SmallLeaf);
         genome[2] = 1;   // dx
         genome[3] = 0;   // dy
-        genome[4] = 0;   // direction (North)
-        genome[5] = OP_HALT;
+        genome[4] = OP_HALT;
 
         auto plant = make_test_plant(genome);
         auto actions = plant.brain().execute_tick(plant, world, test_rng);
@@ -300,7 +299,6 @@ TEST_CASE("Brain action queueing", "[brain]") {
         REQUIRE(actions[0].type == ActionType::PlaceCell);
         REQUIRE(actions[0].cell_type == CellType::SmallLeaf);
         REQUIRE(actions[0].position == GridCoord{51, 50});
-        REQUIRE(actions[0].direction == Direction::North);
     }
 
     SECTION("LAUNCH_SEED queues action with params") {

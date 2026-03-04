@@ -27,13 +27,6 @@ PYBIND11_MODULE(_plantbraingrid, m) {
             return "GridCoord(" + std::to_string(c.x) + ", " + std::to_string(c.y) + ")";
         });
 
-    // Direction
-    py::enum_<Direction>(m, "Direction")
-        .value("North", Direction::North)
-        .value("East", Direction::East)
-        .value("South", Direction::South)
-        .value("West", Direction::West);
-
     // CellType
     py::enum_<CellType>(m, "CellType")
         .value("Empty", CellType::Empty)
@@ -138,7 +131,6 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def_readonly("type", &PlantCell::type)
         .def_readonly("position", &PlantCell::position)
         .def_readonly("enabled", &PlantCell::enabled)
-        .def_readonly("direction", &PlantCell::direction)
         .def_readonly("plant_id", &PlantCell::plant_id)
         .def("is_xylem", &PlantCell::is_xylem)
         .def("is_leaf", &PlantCell::is_leaf);
@@ -190,7 +182,6 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def("place_cell", &Plant::place_cell)
         .def("remove_cell", &Plant::remove_cell)
         .def("toggle_cell", &Plant::toggle_cell)
-        .def("rotate_cell", &Plant::rotate_cell)
         .def("kill", &Plant::kill);
 
     // Seed

@@ -35,12 +35,12 @@ main:
 
 build_body:
     ; Fireproof xylem in all 4 directions for protection
-    PLACE_CELL FireproofXylem, +0, -1, South
-    PLACE_CELL FireproofXylem, +0, +1, North
-    PLACE_CELL FireproofXylem, +1, +0, West
-    PLACE_CELL FireproofXylem, -1, +0, East
+    PLACE_CELL FireproofXylem, +0, -1
+    PLACE_CELL FireproofXylem, +0, +1
+    PLACE_CELL FireproofXylem, +1, +0
+    PLACE_CELL FireproofXylem, -1, +0
     ; Plus a leaf for energy
-    PLACE_CELL SmallLeaf, +0, -2, North
+    PLACE_CELL SmallLeaf, +0, -2
     JUMP main
 
 offense:
@@ -59,11 +59,11 @@ offense:
     JUMP try_reproduce
 
 place_fire_east:
-    PLACE_CELL FireStarter, +1, +0, East
+    PLACE_CELL FireStarter, +1, +0
     JUMP main
 
 place_fire_west:
-    PLACE_CELL FireStarter, -1, +0, West
+    PLACE_CELL FireStarter, -1, +0
     JUMP main
 
 try_reproduce:

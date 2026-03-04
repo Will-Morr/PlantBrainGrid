@@ -44,19 +44,19 @@ TEST_CASE("Plant cell placement", "[plant]") {
 
     SECTION("Can place cell adjacent to existing") {
         REQUIRE(plant.can_place_cell(CellType::SmallLeaf, {51, 50}, world));
-        REQUIRE(plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world));
+        REQUIRE(plant.place_cell(CellType::SmallLeaf, {51, 50}, world));
         REQUIRE(plant.cell_count() == 2);
         REQUIRE(world.cell_at(51, 50).is_occupied());
     }
 
     SECTION("Cannot place cell not adjacent") {
         REQUIRE_FALSE(plant.can_place_cell(CellType::SmallLeaf, {55, 50}, world));
-        REQUIRE_FALSE(plant.place_cell(CellType::SmallLeaf, {55, 50}, Direction::North, world));
+        REQUIRE_FALSE(plant.place_cell(CellType::SmallLeaf, {55, 50}, world));
     }
 
     SECTION("Cannot place on occupied cell") {
         // Place a cell first
-        plant.place_cell(CellType::FiberRoot, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::FiberRoot, {51, 50}, world);
 
         // Try to place another on same spot
         REQUIRE_FALSE(plant.can_place_cell(CellType::SmallLeaf, {51, 50}, world));
@@ -72,7 +72,7 @@ TEST_CASE("Plant cell placement", "[plant]") {
 
     SECTION("Placement costs resources") {
         float initial_energy = plant.resources().energy;
-        plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::SmallLeaf, {51, 50}, world);
         REQUIRE(plant.resources().energy < initial_energy);
     }
 
@@ -92,7 +92,7 @@ TEST_CASE("Plant cell removal", "[plant]") {
     // Setup
     world.cell_at(50, 50).plant_id = plant.id();
     world.cell_at(50, 50).cell_type = CellType::Primary;
-    plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
+    plant.place_cell(CellType::SmallLeaf, {51, 50}, world);
 
     SECTION("Can remove non-primary cell") {
         REQUIRE(plant.cell_count() == 2);
@@ -120,7 +120,7 @@ TEST_CASE("Plant cell toggle", "[plant]") {
 
     world.cell_at(50, 50).plant_id = plant.id();
     world.cell_at(50, 50).cell_type = CellType::Primary;
-    plant.place_cell(CellType::Xylem, {51, 50}, Direction::East, world);
+    plant.place_cell(CellType::Xylem, {51, 50}, world);
 
     SECTION("Can toggle cell enabled state") {
         PlantCell* cell = plant.find_cell({51, 50});
@@ -138,33 +138,6 @@ TEST_CASE("Plant cell toggle", "[plant]") {
     }
 }
 
-TEST_CASE("Plant cell rotation", "[plant]") {
-    std::vector<uint8_t> genome(100, 0);
-    World world(100, 100, 42);
-
-    Plant plant(1, {50, 50}, genome);
-    plant.resources().energy = 1000.0f;
-
-    world.cell_at(50, 50).plant_id = plant.id();
-    world.cell_at(50, 50).cell_type = CellType::Primary;
-    plant.place_cell(CellType::Xylem, {51, 50}, Direction::North, world);
-
-    SECTION("Can rotate xylem cell") {
-        PlantCell* cell = plant.find_cell({51, 50});
-        REQUIRE(cell->direction == Direction::North);
-
-        REQUIRE(plant.rotate_cell({51, 50}, 1));
-        REQUIRE(cell->direction == Direction::East);
-
-        REQUIRE(plant.rotate_cell({51, 50}, 2));
-        REQUIRE(cell->direction == Direction::West);
-    }
-
-    SECTION("Cannot rotate non-xylem cell") {
-        plant.place_cell(CellType::SmallLeaf, {49, 50}, Direction::North, world);
-        REQUIRE_FALSE(plant.rotate_cell({49, 50}, 1));
-    }
-}
 
 TEST_CASE("Plant death", "[plant]") {
     std::vector<uint8_t> genome(100, 0);
@@ -199,7 +172,7 @@ TEST_CASE("Plant thorn blocking", "[plant]") {
     plant1.resources().energy = 1000.0f;
     world.cell_at(50, 50).plant_id = plant1.id();
     world.cell_at(50, 50).cell_type = CellType::Primary;
-    plant1.place_cell(CellType::Thorn, {51, 50}, Direction::North, world);
+    plant1.place_cell(CellType::Thorn, {51, 50}, world);
 
     // Create second plant nearby
     Plant plant2(2, {53, 50}, genome);
@@ -271,7 +244,7 @@ TEST_CASE("Placement resource requirements", "[plant]") {
         World world(100, 100, 42);
         const CellCosts& cost = get_cell_costs(CellType::BigLeaf);
         auto plant = setup(world, cost.build_energy + 10.0f, 1000.0f, cost.build_nutrients + 10.0f);
-        REQUIRE(plant.place_cell(CellType::BigLeaf, {51, 50}, Direction::North, world));
+        REQUIRE(plant.place_cell(CellType::BigLeaf, {51, 50}, world));
         REQUIRE(plant.resources().energy    == 10.0f);
         REQUIRE(plant.resources().nutrients == 10.0f);
         REQUIRE(plant.cell_count() == 2);

@@ -23,12 +23,12 @@ main:
     JUMP_IF_ZERO [THRESH_REG], main                    ; skip if energy <= 50
 
     ; Try to place leaves in all 4 directions
-    PLACE_CELL SmallLeaf, +0, -1, North    ; north
-    PLACE_CELL SmallLeaf, +1, +0, East     ; east
-    PLACE_CELL SmallLeaf, +0, +1, South    ; south
-    PLACE_CELL SmallLeaf, -1, +0, West     ; west
+    PLACE_CELL SmallLeaf, +0, -1    ; north
+    PLACE_CELL SmallLeaf, +1, +0     ; east
+    PLACE_CELL SmallLeaf, +0, +1    ; south
+    PLACE_CELL SmallLeaf, -1, +0     ; west
 
     ; Also try to place a root below us to gather water
-    PLACE_CELL FiberRoot, +0, +2, South
+    PLACE_CELL FiberRoot, +0, +2
 
     JUMP main

@@ -48,10 +48,6 @@ def test_gridcoord_repr():
     assert "4" in repr(c)
 
 
-def test_direction_enum():
-    assert pbg.Direction.North != pbg.Direction.South
-    assert pbg.Direction.East != pbg.Direction.West
-
 
 def test_cell_type_enum():
     assert pbg.CellType.Empty != pbg.CellType.Primary

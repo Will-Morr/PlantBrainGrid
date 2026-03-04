@@ -34,19 +34,19 @@ main:
     JUMP_IF_ZERO [THRESH], main
 
     ; Place xylem connectors to route resources
-    PLACE_CELL Xylem, +0, -1, South
-    PLACE_CELL Xylem, +0, +1, North
+    PLACE_CELL Xylem, +0, -1
+    PLACE_CELL Xylem, +0, +1
 
     ; Spread roots outward (multiple directions)
-    PLACE_CELL FiberRoot, +0, -2, South
-    PLACE_CELL FiberRoot, +1, -1, South
-    PLACE_CELL FiberRoot, -1, -1, South
-    PLACE_CELL FiberRoot, +0, +2, North
-    PLACE_CELL FiberRoot, +1, +1, North
-    PLACE_CELL FiberRoot, -1, +1, North
+    PLACE_CELL FiberRoot, +0, -2
+    PLACE_CELL FiberRoot, +1, -1
+    PLACE_CELL FiberRoot, -1, -1
+    PLACE_CELL FiberRoot, +0, +2
+    PLACE_CELL FiberRoot, +1, +1
+    PLACE_CELL FiberRoot, -1, +1
 
     ; A couple of leaves to maintain energy income
-    PLACE_CELL SmallLeaf, +1, +0, North
-    PLACE_CELL SmallLeaf, -1, +0, North
+    PLACE_CELL SmallLeaf, +1, +0
+    PLACE_CELL SmallLeaf, -1, +0
 
     JUMP main

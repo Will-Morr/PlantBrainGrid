@@ -75,12 +75,11 @@ public:
 
     // Cell management
     bool can_place_cell(CellType type, const GridCoord& pos, const World& world) const;
-    bool place_cell(CellType type, const GridCoord& pos, Direction dir, World& world);
+    bool place_cell(CellType type, const GridCoord& pos, World& world);
     // Place cell without affordability check or cost payment (cost must be pre-paid externally)
-    bool place_cell_free(CellType type, const GridCoord& pos, Direction dir, World& world);
+    bool place_cell_free(CellType type, const GridCoord& pos, World& world);
     bool remove_cell(const GridCoord& pos, World& world);
     bool toggle_cell(const GridCoord& pos, bool enabled);
-    bool rotate_cell(const GridCoord& pos, int rotation);
 
     // Force-deduct placement cost regardless of current resources (may go negative)
     void force_deduct_placement_cost(CellType type);
@@ -131,7 +130,7 @@ private:
     void add_cell_internal(const PlantCell& cell);
     void remove_cell_internal(const GridCoord& pos);
     bool place_cell_shape_ok(CellType type, const GridCoord& pos, const World& world) const;
-    void do_place_cell_internal(CellType type, const GridCoord& pos, Direction dir, World& world);
+    void do_place_cell_internal(CellType type, const GridCoord& pos, World& world);
 };
 
 }  // namespace pbg

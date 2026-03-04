@@ -37,7 +37,6 @@ def make_leaf_genome() -> list:
     genome[i] = 2;    i += 1   # SmallLeaf
     genome[i] = 0;    i += 1   # dx = 0
     genome[i] = 0xFF; i += 1   # dy = -1 (signed: 0xFF = -1)
-    genome[i] = 0;    i += 1   # direction = North
     genome[i] = 0x01; i += 1   # HALT
     return genome
 
@@ -192,7 +191,6 @@ def test_leaf_generates_energy():
     placed = plant.place_cell(
         pbg.CellType.SmallLeaf,
         pbg.GridCoord(51, 50),
-        pbg.Direction.North,
         sim.world()
     )
     assert placed, "Should be able to place leaf adjacent to primary"
@@ -234,7 +232,6 @@ def test_fire_destroys_plant_cell():
         plant.place_cell(
             pbg.CellType.SmallLeaf,
             pbg.GridCoord(51, 50),
-            pbg.Direction.North,
             sim.world()
         )
         assert plant.cell_count() == 2

@@ -206,11 +206,11 @@ TEST_CASE("Thorn damage to adjacent plants", "[simulation]") {
         victim->resources().water    = 1000.0f;
 
         // Give victim a leaf adjacent to its primary
-        victim->place_cell(CellType::SmallLeaf, {52, 50}, Direction::North, sim.world());
+        victim->place_cell(CellType::SmallLeaf, {52, 50}, sim.world());
         REQUIRE(victim->cell_count() == 2);
 
         // Give attacker a thorn adjacent to its primary (and adjacent to the victim leaf)
-        attacker->place_cell(CellType::Thorn, {51, 50}, Direction::North, sim.world());
+        attacker->place_cell(CellType::Thorn, {51, 50}, sim.world());
         REQUIRE(attacker->cell_count() == 2);
 
         // One tick should trigger thorn damage and remove the leaf
@@ -233,7 +233,7 @@ TEST_CASE("Thorn damage to adjacent plants", "[simulation]") {
         victim->resources().water    = 1000.0f;
 
         // Place thorn directly adjacent to victim's primary
-        attacker->place_cell(CellType::Thorn, {51, 50}, Direction::North, sim.world());
+        attacker->place_cell(CellType::Thorn, {51, 50}, sim.world());
         REQUIRE(attacker->cell_count() == 2);
 
         sim.advance_tick();
@@ -249,8 +249,8 @@ TEST_CASE("Thorn damage to adjacent plants", "[simulation]") {
         plant->resources().energy = 1000.0f;
         plant->resources().water  = 1000.0f;
 
-        plant->place_cell(CellType::Thorn,     {51, 50}, Direction::North, sim.world());
-        plant->place_cell(CellType::SmallLeaf, {52, 50}, Direction::North, sim.world());
+        plant->place_cell(CellType::Thorn,     {51, 50}, sim.world());
+        plant->place_cell(CellType::SmallLeaf, {52, 50}, sim.world());
 
         sim.advance_tick();
 
@@ -274,7 +274,7 @@ TEST_CASE("Fire damage to plants", "[simulation]") {
         plant->resources().water = 1000.0f;
 
         // Add a leaf
-        plant->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim.world());
+        plant->place_cell(CellType::SmallLeaf, {51, 50}, sim.world());
         REQUIRE(plant->cell_count() == 2);
 
         // Set fire to leaf position
@@ -312,7 +312,7 @@ TEST_CASE("Fire damage to plants", "[simulation]") {
         plant->resources().energy = 1000.0f;
         plant->resources().water = 1000.0f;
 
-        plant->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim.world());
+        plant->place_cell(CellType::SmallLeaf, {51, 50}, sim.world());
 
         sim.world().cell_at(51, 50).water_level = 0.0f;
         sim.world().ignite({51, 50});
@@ -343,7 +343,7 @@ TEST_CASE("Fire damage to plants", "[simulation]") {
         plant->resources().energy = 1000.0f;
         plant->resources().water = 1000.0f;
 
-        plant->place_cell(CellType::FireproofXylem, {51, 50}, Direction::North, sim.world());
+        plant->place_cell(CellType::FireproofXylem, {51, 50}, sim.world());
 
         sim.world().cell_at(50, 50).water_level = 0.0f;
         sim.world().cell_at(51, 50).water_level = 0.0f;
@@ -369,7 +369,7 @@ TEST_CASE("Resource processing", "[simulation]") {
         plant->resources().water = 100.0f;
         plant->resources().nutrients = 100.0f;
 
-        plant->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim.world());
+        plant->place_cell(CellType::SmallLeaf, {51, 50}, sim.world());
 
         // Record state before tick
         float energy_before = plant->resources().energy;
@@ -572,7 +572,7 @@ TEST_CASE("Old age death", "[simulation]") {
         Plant* plant = sim.add_plant({50, 50}, genome);
         plant->resources().energy = 1000.0f;
         plant->resources().water  = 1000.0f;
-        plant->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim.world());
+        plant->place_cell(CellType::SmallLeaf, {51, 50}, sim.world());
         REQUIRE(plant->cell_count() == 2);
 
         // After 3 ticks both cells have age_ticks=3.  The leaf is culled;
@@ -616,8 +616,7 @@ TEST_CASE("Cell overlap prevention", "[simulation]") {
     placer_genome[1] = 0x02; // SmallLeaf
     placer_genome[2] = 0x01; // dx=+1
     placer_genome[3] = 0x00; // dy=0
-    placer_genome[4] = 0x00; // direction North
-    placer_genome[5] = 0x01; // OP_HALT
+    placer_genome[4] = 0x01; // OP_HALT
 
     std::vector<uint8_t> idle_genome(1024, 0); // all NOPs, effectively idle
     idle_genome[0] = 0x01; // OP_HALT immediately
@@ -637,7 +636,7 @@ TEST_CASE("Cell overlap prevention", "[simulation]") {
         b->resources().water  = 1000.0f;
 
         // Manually place B's leaf at (51,50) — the same tile A will try to claim
-        b->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim.world());
+        b->place_cell(CellType::SmallLeaf, {51, 50}, sim.world());
         REQUIRE(b->cell_count() == 2);
 
         sim.advance_tick();
@@ -679,7 +678,7 @@ TEST_CASE("Cell overlap prevention", "[simulation]") {
         a->resources().nutrients = 0.0f;
 
         // Pre-place the leaf so the target tile is already owned by A
-        a->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim.world());
+        a->place_cell(CellType::SmallLeaf, {51, 50}, sim.world());
 
         // Run a reference tick with an idle plant to measure baseline resource change
         Simulation sim_ref(100, 100, 42);
@@ -687,7 +686,7 @@ TEST_CASE("Cell overlap prevention", "[simulation]") {
         ref->resources().energy    = 1000.0f;
         ref->resources().water     = 1000.0f;
         ref->resources().nutrients = 0.0f;
-        ref->place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, sim_ref.world());
+        ref->place_cell(CellType::SmallLeaf, {51, 50}, sim_ref.world());
 
         auto& cfg = get_config();
         uint32_t orig_cell  = cfg.max_cell_age;

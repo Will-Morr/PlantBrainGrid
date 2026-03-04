@@ -17,7 +17,6 @@ enum class ActionType : uint8_t {
     PlaceCell,
     RemoveCell,
     ToggleCell,
-    RotateCell,
     LaunchSeed
 };
 
@@ -25,9 +24,7 @@ struct QueuedAction {
     ActionType type;
     GridCoord position;
     CellType cell_type = CellType::Empty;
-    Direction direction = Direction::North;
     bool toggle_state = true;
-    int rotation = 0;
 
     // For seed launching
     struct SeedParams {

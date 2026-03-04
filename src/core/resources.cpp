@@ -159,10 +159,12 @@ ResourceSystem::build_adjacency_graph(const Plant& plant) {
 
 std::vector<GridCoord> ResourceSystem::find_path_to_primary(
     const GridCoord& start,
-    const GridCoord& primary,
+    const std::unordered_set<GridCoord>& anchors,
     const std::unordered_map<GridCoord, std::vector<GridCoord>>& adj)
 {
-    if (start == primary) {
+    // Anchors are the primary cell plus all xylem cells — xylem acts as relay
+    // nodes equivalent to the primary for distance calculation.
+    if (anchors.count(start)) {
         return {start};
     }
 
@@ -177,10 +179,10 @@ std::vector<GridCoord> ResourceSystem::find_path_to_primary(
         GridCoord current = queue.front();
         queue.pop();
 
-        if (current == primary) {
+        if (anchors.count(current)) {
             // Reconstruct path
             std::vector<GridCoord> path;
-            GridCoord node = primary;
+            GridCoord node = current;
             while (node != start) {
                 path.push_back(node);
                 node = parent[node];

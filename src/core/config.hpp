@@ -63,6 +63,7 @@ struct Config {
     uint16_t mutation_block_min_size = 4;   // min bytes in per-seed block mutation
     uint16_t mutation_block_max_size = 64;  // max bytes in per-seed block mutation
     float max_mate_distance = 100.0f;
+    float mate_distance_bias = 1.0f;  // Score penalty per unit of distance (always applied)
     float seed_launch_distance_per_energy = 2.0f;
 
     // Fire

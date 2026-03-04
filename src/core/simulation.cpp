@@ -185,8 +185,6 @@ Simulation::collect_all_actions() {
             } else {
                 if (action.type == ActionType::ToggleCell) {
                     plant.toggle_cell(action.position, action.toggle_state);
-                } else if (action.type == ActionType::RotateCell) {
-                    plant.rotate_cell(action.position, action.rotation);
                 }
             }
         }
@@ -284,7 +282,7 @@ TickStats Simulation::apply_actions(
 
                 // Charge full cost and attempt placement
                 plant->force_deduct_placement_cost(action.cell_type);
-                if (plant->place_cell_free(action.cell_type, action.position, action.direction, world_)) {
+                if (plant->place_cell_free(action.cell_type, action.position, world_)) {
                     ++stats.cells_placed;
                 }
             }

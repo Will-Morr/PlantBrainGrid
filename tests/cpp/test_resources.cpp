@@ -26,7 +26,7 @@ TEST_CASE("Leaf energy generation", "[resources]") {
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         // Place a small leaf
-        plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::SmallLeaf, {51, 50}, world);
 
         float energy = ResourceSystem::calculate_leaf_energy(plant, world);
         float expected = cfg.small_leaf_energy_rate * world.current_light_multiplier();
@@ -39,7 +39,7 @@ TEST_CASE("Leaf energy generation", "[resources]") {
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
-        plant.place_cell(CellType::BigLeaf, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::BigLeaf, {51, 50}, world);
 
         float energy = ResourceSystem::calculate_leaf_energy(plant, world);
         float expected = cfg.big_leaf_energy_rate * world.current_light_multiplier();
@@ -53,7 +53,7 @@ TEST_CASE("Leaf energy generation", "[resources]") {
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
-        plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::SmallLeaf, {51, 50}, world);
         plant.toggle_cell({51, 50}, false);
 
         float energy = ResourceSystem::calculate_leaf_energy(plant, world);
@@ -65,9 +65,9 @@ TEST_CASE("Leaf energy generation", "[resources]") {
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
-        plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
-        plant.place_cell(CellType::SmallLeaf, {49, 50}, Direction::North, world);
-        plant.place_cell(CellType::SmallLeaf, {50, 51}, Direction::North, world);
+        plant.place_cell(CellType::SmallLeaf, {51, 50}, world);
+        plant.place_cell(CellType::SmallLeaf, {49, 50}, world);
+        plant.place_cell(CellType::SmallLeaf, {50, 51}, world);
 
         float energy = ResourceSystem::calculate_leaf_energy(plant, world);
         float expected = 3.0f * cfg.small_leaf_energy_rate * world.current_light_multiplier();
@@ -89,7 +89,7 @@ TEST_CASE("Root water extraction", "[resources]") {
         float initial_water = 50.0f;
         world.cell_at(root_pos).water_level = initial_water;
 
-        plant.place_cell(CellType::FiberRoot, root_pos, Direction::North, world);
+        plant.place_cell(CellType::FiberRoot, root_pos, world);
 
         float extracted = ResourceSystem::calculate_root_water(plant, world);
 
@@ -109,7 +109,7 @@ TEST_CASE("Root water extraction", "[resources]") {
         float low_water = 0.5f;
         world.cell_at(root_pos).water_level = low_water;
 
-        plant.place_cell(CellType::FiberRoot, root_pos, Direction::North, world);
+        plant.place_cell(CellType::FiberRoot, root_pos, world);
 
         float extracted = ResourceSystem::calculate_root_water(plant, world);
 
@@ -128,7 +128,7 @@ TEST_CASE("Root water extraction", "[resources]") {
         float initial_water = 50.0f;
         world.cell_at(root_pos).water_level = initial_water;
 
-        plant.place_cell(CellType::FiberRoot, root_pos, Direction::North, world);
+        plant.place_cell(CellType::FiberRoot, root_pos, world);
         plant.toggle_cell(root_pos, false);
 
         float extracted = ResourceSystem::calculate_root_water(plant, world);
@@ -151,7 +151,7 @@ TEST_CASE("Root nutrient extraction", "[resources]") {
         float initial_nutrients = 30.0f;
         world.cell_at(root_pos).nutrient_level = initial_nutrients;
 
-        plant.place_cell(CellType::FiberRoot, root_pos, Direction::North, world);
+        plant.place_cell(CellType::FiberRoot, root_pos, world);
 
         float extracted = ResourceSystem::calculate_root_nutrients(plant, world);
 
@@ -180,7 +180,7 @@ TEST_CASE("Maintenance costs", "[resources]") {
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
-        plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::SmallLeaf, {51, 50}, world);
 
         Resources maintenance = ResourceSystem::calculate_maintenance(plant);
 
@@ -196,8 +196,8 @@ TEST_CASE("Maintenance costs", "[resources]") {
         world.cell_at(plant2.primary_position()).plant_id = plant2.id();
         world.cell_at(plant2.primary_position()).cell_type = CellType::Primary;
 
-        plant1.place_cell(CellType::SmallLeaf, {41, 50}, Direction::North, world);
-        plant2.place_cell(CellType::BigLeaf, {61, 50}, Direction::North, world);
+        plant1.place_cell(CellType::SmallLeaf, {41, 50}, world);
+        plant2.place_cell(CellType::BigLeaf, {61, 50}, world);
 
         Resources m1 = ResourceSystem::calculate_maintenance(plant1);
         Resources m2 = ResourceSystem::calculate_maintenance(plant2);
@@ -211,7 +211,7 @@ TEST_CASE("Maintenance costs", "[resources]") {
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
-        plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::SmallLeaf, {51, 50}, world);
         Resources m1 = ResourceSystem::calculate_maintenance(plant);
 
         plant.toggle_cell({51, 50}, false);
@@ -237,8 +237,8 @@ TEST_CASE("Full resource tick", "[resources]") {
         world.cell_at(root_pos).water_level = 100.0f;
         world.cell_at(root_pos).nutrient_level = 50.0f;
 
-        plant.place_cell(CellType::SmallLeaf, leaf_pos, Direction::North, world);
-        plant.place_cell(CellType::FiberRoot, root_pos, Direction::North, world);
+        plant.place_cell(CellType::SmallLeaf, leaf_pos, world);
+        plant.place_cell(CellType::FiberRoot, root_pos, world);
 
         float initial_energy = plant.resources().energy;
         float initial_water = plant.resources().water;
@@ -288,7 +288,7 @@ TEST_CASE("Xylem flow", "[resources]") {
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
         // Add xylem
-        plant.place_cell(CellType::Xylem, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::Xylem, {51, 50}, world);
 
         float initial_energy = plant.resources().energy;
 
@@ -302,7 +302,7 @@ TEST_CASE("Xylem flow", "[resources]") {
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
-        plant.place_cell(CellType::Xylem, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::Xylem, {51, 50}, world);
         plant.toggle_cell({51, 50}, false);
 
         float initial_energy = plant.resources().energy;
@@ -317,7 +317,7 @@ TEST_CASE("Xylem flow", "[resources]") {
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
-        plant.place_cell(CellType::FireproofXylem, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::FireproofXylem, {51, 50}, world);
 
         float initial_energy = plant.resources().energy;
 
@@ -336,7 +336,7 @@ TEST_CASE("Seasonal light affects energy", "[resources]") {
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
-        plant.place_cell(CellType::SmallLeaf, {51, 50}, Direction::North, world);
+        plant.place_cell(CellType::SmallLeaf, {51, 50}, world);
 
         // Get energy at start
         float energy_start = ResourceSystem::calculate_leaf_energy(plant, world);

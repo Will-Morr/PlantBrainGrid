@@ -53,14 +53,15 @@ float ReproductionSystem::calculate_mate_score(
 {
     float score = 0.0f;
 
+    float dx = static_cast<float>(candidate.primary_position().x - mother.primary_position().x);
+    float dy = static_cast<float>(candidate.primary_position().y - mother.primary_position().y);
+    float distance = std::sqrt(dx * dx + dy * dy);
+
     for (const auto& [criterion, weight] : search_state.weights) {
         float value = get_criterion_value(candidate, criterion);
 
         // For distance, invert so closer is better
         if (criterion == MATE_CRITERION_DISTANCE) {
-            float dx = static_cast<float>(candidate.primary_position().x - mother.primary_position().x);
-            float dy = static_cast<float>(candidate.primary_position().y - mother.primary_position().y);
-            float distance = std::sqrt(dx * dx + dy * dy);
             value = search_state.max_distance - distance;
         }
 
@@ -84,6 +85,9 @@ float ReproductionSystem::calculate_mate_score(
 
         score += value * static_cast<float>(weight);
     }
+
+    // Always apply distance bias: closer candidates score higher
+    score -= distance * get_config().mate_distance_bias;
 
     return score;
 }

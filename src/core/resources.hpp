@@ -4,6 +4,7 @@
 #include "core/plant.hpp"
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace pbg {
 
@@ -57,10 +58,11 @@ private:
     static std::unordered_map<GridCoord, std::vector<GridCoord>>
         build_adjacency_graph(const Plant& plant);
 
-    // Find path from cell to primary using BFS
+    // Find shortest path from a cell to the nearest anchor (primary or xylem) using BFS.
+    // Xylem cells act as relay points equivalent to the primary for distance purposes.
     static std::vector<GridCoord> find_path_to_primary(
         const GridCoord& start,
-        const GridCoord& primary,
+        const std::unordered_set<GridCoord>& anchors,
         const std::unordered_map<GridCoord, std::vector<GridCoord>>& adj);
 };
 

@@ -484,33 +484,23 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
             uint8_t type_byte = read_arg();
             int8_t dx = read_arg_signed();
             int8_t dy = read_arg_signed();
-            uint8_t dir_byte = read_arg();
 
             CellType type = static_cast<CellType>(type_byte % 10);
-            Direction dir = direction_from_byte(dir_byte);
             GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
 
             QueuedAction action;
             action.type = ActionType::PlaceCell;
             action.position = pos;
             action.cell_type = type;
-            action.direction = dir;
             actions.push_back(action);
             break;
         }
 
         case OP_ROTATE_CELL: {
-            int8_t dx = read_arg_signed();
-            int8_t dy = read_arg_signed();
-            int8_t rotation = read_arg_signed();
-
-            GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
-
-            QueuedAction action;
-            action.type = ActionType::RotateCell;
-            action.position = pos;
-            action.rotation = rotation;
-            actions.push_back(action);
+            // Orientation removed — read and discard 3 args (NOP)
+            read_arg_signed();
+            read_arg_signed();
+            read_arg_signed();
             break;
         }
 

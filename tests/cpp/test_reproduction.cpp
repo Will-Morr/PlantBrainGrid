@@ -327,6 +327,34 @@ TEST_CASE("Mate selection", "[reproduction]") {
 
         REQUIRE(selected == 2);  // Should select closer mate
     }
+
+    SECTION("Default distance bias favors closer mates without explicit criterion") {
+        auto& cfg = get_config();
+        float orig_bias = cfg.mate_distance_bias;
+        cfg.mate_distance_bias = 1.0f;
+
+        auto mother = make_test_plant(1, {50, 50});
+        auto close = make_test_plant(2, {52, 50});   // Distance 2
+        auto far = make_test_plant(3, {70, 50});     // Distance 20
+
+        // Give both candidates identical size so size weighting doesn't break the tie
+        std::vector<Plant> all_plants;
+        all_plants.push_back(std::move(mother));
+        all_plants.push_back(std::move(close));
+        all_plants.push_back(std::move(far));
+
+        MateSearchState search;
+        search.max_distance = 100.0f;
+        search.weights.push_back({MATE_CRITERION_SIZE, 1});
+
+        uint64_t selected = ReproductionSystem::select_mate(
+            all_plants[0], all_plants, search);
+
+        // Closer plant selected purely due to default distance bias
+        REQUIRE(selected == 2);
+
+        cfg.mate_distance_bias = orig_bias;
+    }
 }
 
 TEST_CASE("Landing position calculation", "[reproduction]") {

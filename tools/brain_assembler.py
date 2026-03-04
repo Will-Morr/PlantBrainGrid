@@ -51,8 +51,8 @@ Assembly format:
     SENSE_AGE [dest]
 
     ; Plant actions
-    PLACE_CELL type, dx, dy, direction    ; type=SmallLeaf|BigLeaf|Root|Xylem|FireproofXylem|Thorn|FireStarter
-    ROTATE_CELL dx, dy, rotation
+    PLACE_CELL type, dx, dy    ; type=SmallLeaf|BigLeaf|Root|Xylem|FireproofXylem|Thorn|FireStarter
+    ROTATE_CELL dx, dy, rotation    ; NOP (orientation removed; args consumed for compatibility)
     TOGGLE_CELL dx, dy, ON|OFF|1|0
     REMOVE_CELL dx, dy
 
@@ -117,7 +117,7 @@ OPCODES = {
     "SENSE_SELF_NUTRIENTS": (0x48, "addr16"),
     "SENSE_CELL_COUNT": (0x49, "addr16"),
     "SENSE_AGE": (0x4A, "addr16"),
-    "PLACE_CELL": (0x60, "ctype rel8 rel8 dir4"),
+    "PLACE_CELL": (0x60, "ctype rel8 rel8"),
     "ROTATE_CELL": (0x61, "rel8 rel8 rel8"),
     "TOGGLE_CELL": (0x62, "rel8 rel8 bool"),
     "REMOVE_CELL": (0x63, "rel8 rel8"),
@@ -131,11 +131,6 @@ CELL_TYPES = {
     "Empty": 0, "Primary": 1, "SmallLeaf": 2, "BigLeaf": 3,
     "FiberRoot": 4, "Xylem": 5, "FireproofXylem": 6, "Thorn": 7, "FireStarter": 8,
     "TapRoot": 9,
-}
-
-DIRECTIONS = {
-    "North": 0, "East": 1, "South": 2, "West": 3,
-    "N": 0, "E": 1, "S": 2, "W": 3,
 }
 
 MATE_CRITERIA = {
@@ -370,13 +365,6 @@ class BrainAssembler:
                     self._emit(CELL_TYPES[ct])
                 else:
                     self._emit(self._parse_int(arg, "cell type") % 9)
-
-            elif fmt_type == "dir4":
-                d = arg.strip()
-                if d in DIRECTIONS:
-                    self._emit(DIRECTIONS[d])
-                else:
-                    self._emit(self._parse_int(arg, "direction") % 4)
 
             elif fmt_type == "bool":
                 larg = arg.strip().lower()
