@@ -52,27 +52,69 @@ main:
     ; Sense current cell count into TMP.
     ; CMP_EQ sets GROWN=1 when count==5 (primary + root + 3 leaves).
     ; JUMP_IF_NEQ skips the growth phase when GROWN!=0 (already grown).
-    SENSE_CELL_COUNT [TMP]
-    LOAD_IMM  [THRESH], 5
-    CMP_EQ    [GROWN], [TMP], [THRESH]
-    JUMP_IF_NEQ [GROWN], 0, reproduce
+    ; SENSE_CELL_COUNT [TMP]
+    ; LOAD_IMM  [THRESH], 2
+    ; CMP_EQ    [GROWN], [TMP], [THRESH]
+    ; JUMP_IF_NEQ [GROWN], 0, reproduce
 
     ; --- Growth phase (only when count < 5) ---
-    PLACE_CELL FiberRoot, +0, +1
+    ; PLACE_CELL FiberRoot, +0, +1, North
+    ; PLACE_CELL SmallLeaf, +0, -1, North
+    ; PLACE_CELL SmallLeaf, +1,  0, North
+    ; PLACE_CELL SmallLeaf, -1,  0, North
+
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+
     PLACE_CELL SmallLeaf, +0, -1
-    PLACE_CELL SmallLeaf, +1,  0
-    PLACE_CELL SmallLeaf, -1,  0
+    PLACE_CELL FiberRoot, +0, +1
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
 
 reproduce:
     ; --- Reproduction check ---
     ; 220 bytes / 2.55 ≈ 86 units > 72-unit seed cost, so launch is always
     ; affordable when the brain decides to launch.
-    SENSE_SELF_ENERGY [ENERGY]
-    LOAD_IMM  [THRESH], 220
-    CMP_LT    [THRESH], [THRESH], [ENERGY]
-    JUMP_IF_ZERO [THRESH], done
+    ; SENSE_SELF_ENERGY [ENERGY]
+    ; LOAD_IMM  [THRESH], 220
+    ; CMP_LT    [THRESH], [THRESH], [ENERGY]
+    ; JUMP_IF_ZERO [THRESH], done
 
-    LAUNCH_SEED Alternating, 120, 60, 10, 25, +0, +0, random
+    LAUNCH_SEED Alternating, 200, 200, 0, 10, +10, +10, random
+    RET
 
 done:
     HALT
