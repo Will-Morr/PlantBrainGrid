@@ -22,8 +22,8 @@ struct Config {
     float water_base = 0.8f;
     float water_amplitude = 2.0f;
     float water_min = 0.15f;
-    float nutrient_base = 1.0f;
-    float nutrient_amplitude = 2.0f;
+    float nutrient_base = 0.75f;
+    float nutrient_amplitude = 3.0f;
 
     // Plants
     uint16_t brain_size = 1024;
@@ -37,12 +37,12 @@ struct Config {
     // Resources (income rates)
     float xylem_transfer_cost = 0.05f;
     float small_leaf_energy_rate = 1.0f;
-    float big_leaf_energy_rate = 3.0f;
+    float big_leaf_energy_rate = 10.0f;
     float big_leaf_water_cost = 2.0f;
     float big_leaf_nutrient_cost = 1.5f;
     float primary_water_rate = 0.2f;       // small water draw from primary cell
     float fiber_root_water_rate = 1.5f;
-    float fiber_root_nutrient_rate = 0.5f;
+    float fiber_root_nutrient_rate = 1.0f;
     float tap_root_water_rate = 3.5f;      // tap root draws more water, no nutrients
 
     // Cell costs (build and maintenance per cell type)
@@ -50,7 +50,7 @@ struct Config {
     //                              energy  water  nutrients  energy  water  nutrients
     CellCosts primary_costs         = { 10,  0,   0,   0.1,   0,    0   };
     CellCosts small_leaf_costs      = { 10,  0,   0,   0,     0.2,  0   };
-    CellCosts big_leaf_costs        = { 25,  0,   10,  0,     1,    0.3 };
+    CellCosts big_leaf_costs        = { 25,  0,   10,  0,     0.4,  0.3 };
     CellCosts fiber_root_costs      = { 8,   0,   0,   0.2,   0,    0   };
     CellCosts tap_root_costs        = { 12,  0,   0,   0.1,   0,    0   };
     CellCosts xylem_costs           = { 12,  0,   0,   0.05,  0,    0   };

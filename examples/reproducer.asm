@@ -43,10 +43,6 @@
 .define ENERGY  0x0005
 .define THRESH  0x0006
 
-    JUMP main          ; bytes 0-2: always jump to main, skipping variable zone
-
-.org 0x07              ; bytes 3-6 are the variable zone (zero-initialised = NOP)
-
 main:
     ; --- Growth check ---
     ; Sense current cell count into TMP.
@@ -63,48 +59,11 @@ main:
     ; PLACE_CELL SmallLeaf, +1,  0, North
     ; PLACE_CELL SmallLeaf, -1,  0, North
 
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
+    PLACE_CELL SmallLeaf, +0, -1
 
-    PLACE_CELL SmallLeaf, -1, +0
-    PLACE_CELL SmallLeaf, +1, +0
-    PLACE_CELL TapRoot, +0, +1
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-    HALT
-
+    ; PLACE_CELL SmallLeaf, -1, +0
+    ; PLACE_CELL SmallLeaf, +1, +0
+    ; PLACE_CELL FiberRoot, +0, +1
 reproduce:
     ; --- Reproduction check ---
     ; 220 bytes / 2.55 ≈ 86 units > 72-unit seed cost, so launch is always
@@ -114,7 +73,46 @@ reproduce:
     ; CMP_LT    [THRESH], [THRESH], [ENERGY]
     ; JUMP_IF_ZERO [THRESH], done
 
-    LAUNCH_SEED Alternating, 200, 200, 0, 10, +10, +10, random
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+
+    LAUNCH_SEED Alternating, 200, 200, 100, 10, +10, +10, random
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+    HALT
+
     RET
 
 done:
