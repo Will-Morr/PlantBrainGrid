@@ -37,7 +37,7 @@ struct Config {
     // Resources (income rates)
     float xylem_transfer_cost = 0.05f;
     float small_leaf_energy_rate = 1.0f;
-    float big_leaf_energy_rate = 10.0f;
+    float big_leaf_energy_rate = 5.0f;
     float big_leaf_water_cost = 2.0f;
     float big_leaf_nutrient_cost = 1.5f;
     float primary_water_rate = 0.2f;       // small water draw from primary cell
