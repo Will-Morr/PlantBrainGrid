@@ -77,8 +77,9 @@ main:
     HALT
     HALT
 
-    PLACE_CELL SmallLeaf, +0, -1
-    ; PLACE_CELL TapRoot, +0, +1
+    PLACE_CELL SmallLeaf, -1, +0
+    PLACE_CELL SmallLeaf, +1, +0
+    PLACE_CELL TapRoot, +0, +1
     HALT
     HALT
     HALT

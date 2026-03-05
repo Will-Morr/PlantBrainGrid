@@ -40,7 +40,7 @@ struct Config {
     float big_leaf_energy_rate = 3.0f;
     float big_leaf_water_cost = 2.0f;
     float big_leaf_nutrient_cost = 1.5f;
-    float primary_water_rate = 0.3f;       // small water draw from primary cell
+    float primary_water_rate = 0.2f;       // small water draw from primary cell
     float fiber_root_water_rate = 1.5f;
     float fiber_root_nutrient_rate = 0.5f;
     float tap_root_water_rate = 3.5f;      // tap root draws more water, no nutrients
