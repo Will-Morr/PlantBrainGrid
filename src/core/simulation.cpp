@@ -329,7 +329,8 @@ void Simulation::process_resources() {
 void Simulation::check_starvation() {
     for (auto& plant : plants_) {
         if (!plant.is_alive()) continue;
-        if (plant.resources().energy < 0.0f || plant.resources().water < 0.0f) {
+        if (plant.resources().energy < 0.0f || plant.resources().water < 0.0f ||
+            plant.resources().nutrients < 0.0f) {
             plant.kill();
         }
     }
@@ -452,12 +453,16 @@ TickStats Simulation::advance_tick() {
     // 9. Update seeds in flight
     update_seeds();
 
+    // 9.5 Clear ghost cells from plants that died this tick so seeds can
+    // germinate on tiles that were freed (e.g. primary displaced, starvation).
+    remove_dead_plants();
+
     // 10. Germinate landed seeds
     size_t seeds_before = seeds_.size();
     germinate_seeds();
     stats.seeds_germinated = seeds_before - seeds_.size();
 
-    // 11. Remove dead plants
+    // 11. Remove dead plants (catches any killed by thorn damage in step 8)
     size_t plants_before = plants_.size();
     remove_dead_plants();
     stats.plants_died = plants_before - plants_.size();

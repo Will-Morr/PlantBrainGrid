@@ -491,6 +491,57 @@ TEST_CASE("Starvation death", "[simulation]") {
         }
         REQUIRE(died);
     }
+
+    SECTION("Negative nutrients from placement cost kills the plant") {
+        // Brain places Bark (build costs 1 water + 1 nutrient); plant has 0 nutrients.
+        // OP_PLACE_CELL=0x60, Bark=6, dx=+1, dy=0, HALT=0x01
+        std::vector<uint8_t> bark_placer(1024, 0);
+        bark_placer[0] = 0x60; bark_placer[1] = 0x06;  // OP_PLACE_CELL, Bark
+        bark_placer[2] = 0x01; bark_placer[3] = 0x00;  // dx=+1, dy=0
+        bark_placer[4] = 0x01;                          // OP_HALT
+
+        Simulation sim(100, 100, 42);
+        Plant* plant = sim.add_plant({50, 50}, bark_placer);
+        plant->resources().energy    = 1000.0f;
+        plant->resources().water     = 1000.0f;
+        plant->resources().nutrients = 0.0f;  // can't afford the 1-nutrient build cost
+
+        sim.advance_tick();
+
+        // Nutrients go to -1 from force_deduct; plant should die
+        REQUIRE(sim.plants().empty());
+    }
+}
+
+TEST_CASE("Ghost cell cleanup before germination", "[simulation]") {
+    // A plant dying this tick should not block a seed from germinating on its tile.
+    Simulation sim(100, 100, 42);
+
+    std::vector<uint8_t> idle(1024, 0x01);  // all HALTs
+
+    // Plant A at (50,50) with negative energy — dies in check_starvation this tick.
+    Plant* a = sim.add_plant({50, 50}, idle);
+    a->resources().energy    = -1.0f;
+    a->resources().water     = 1000.0f;
+    a->resources().nutrients = 100.0f;
+
+    // Add a grounded seed (not in flight) targeting (50,50).
+    Seed seed;
+    seed.genome    = std::vector<uint8_t>(1024, 0x01);
+    seed.energy    = 100.0f;
+    seed.water     = 100.0f;
+    seed.nutrients = 50.0f;
+    seed.in_flight = false;
+    seed.position  = {50, 50};
+    seed.mother_id = 0;
+    seed.father_id = 0;
+    sim.add_seed(std::move(seed));
+
+    sim.advance_tick();
+
+    // A died; the seed should have germinated at (50,50).
+    REQUIRE(sim.plants().size() == 1);
+    REQUIRE(sim.plants()[0].primary_position() == GridCoord(50, 50));
 }
 
 TEST_CASE("Reproducer colonises world", "[simulation]") {
