@@ -23,36 +23,30 @@ TEST_CASE("Genome recombination", "[reproduction]") {
     std::vector<uint8_t> mother_genome(100, 0xAA);
     std::vector<uint8_t> father_genome(100, 0x55);
 
-    SECTION("MotherOnly returns mother's genome") {
+    SECTION("Mother75 biases toward mother's genome") {
         auto offspring = ReproductionSystem::recombine_genomes(
-            mother_genome, father_genome, RecombinationMethod::MotherOnly, rng);
+            mother_genome, father_genome, RecombinationMethod::Mother75, rng);
 
-        for (size_t i = 0; i < 100; ++i) {
-            REQUIRE(offspring[i] == 0xAA);
+        int mother_count = 0;
+        for (auto byte : offspring) {
+            if (byte == 0xAA) ++mother_count;
         }
+        // Expect roughly 75% mother bytes
+        REQUIRE(mother_count > 60);
+        REQUIRE(mother_count < 100);
     }
 
-    SECTION("FatherOnly returns father's genome") {
+    SECTION("Father75 biases toward father's genome") {
         auto offspring = ReproductionSystem::recombine_genomes(
-            mother_genome, father_genome, RecombinationMethod::FatherOnly, rng);
+            mother_genome, father_genome, RecombinationMethod::Father75, rng);
 
-        for (size_t i = 0; i < 100; ++i) {
-            REQUIRE(offspring[i] == 0x55);
+        int father_count = 0;
+        for (auto byte : offspring) {
+            if (byte == 0x55) ++father_count;
         }
-    }
-
-    SECTION("HalfHalf splits genome") {
-        auto offspring = ReproductionSystem::recombine_genomes(
-            mother_genome, father_genome, RecombinationMethod::HalfHalf, rng);
-
-        // First half should be mother
-        for (size_t i = 0; i < 50; ++i) {
-            REQUIRE(offspring[i] == 0xAA);
-        }
-        // Second half should be father
-        for (size_t i = 50; i < 100; ++i) {
-            REQUIRE(offspring[i] == 0x55);
-        }
+        // Expect roughly 75% father bytes
+        REQUIRE(father_count > 60);
+        REQUIRE(father_count < 100);
     }
 
     SECTION("Alternating alternates bytes") {
@@ -155,7 +149,7 @@ TEST_CASE("Seed creation", "[reproduction]") {
 
     SECTION("Seed creation deducts resources") {
         QueuedAction::SeedParams params;
-        params.recomb_method = RecombinationMethod::MotherOnly;
+        params.recomb_method = RecombinationMethod::RandomMix;
         params.energy = 100;  // Scaled value
         params.water = 50;
         params.nutrients = 25;
@@ -180,7 +174,7 @@ TEST_CASE("Seed creation", "[reproduction]") {
         params.water = 50;
         params.nutrients = 25;
         params.launch_power = 10;
-        params.recomb_method = RecombinationMethod::MotherOnly;
+        params.recomb_method = RecombinationMethod::RandomMix;
 
         auto seed = ReproductionSystem::create_seed(mother, father, params, world.rng());
 
@@ -433,6 +427,49 @@ TEST_CASE("Anther gate in mate selection", "[reproduction]") {
 
         REQUIRE(selected == 0);  // Disabled anther doesn't count
     }
+}
+
+TEST_CASE("MATE_BY_CELL_COUNT selects by cell type count", "[reproduction]") {
+    auto& cfg = get_config();
+    float orig_bias  = cfg.mate_distance_bias;
+    float orig_noise = cfg.mate_selection_noise;
+    cfg.mate_distance_bias  = 0.0f;  // disable so only cell-count score decides
+    cfg.mate_selection_noise = 0.0f;
+
+    World world(200, 200, 42);
+    // Mother at (50,50).  Both candidates at equal distance (10) to the right.
+    auto mother = make_test_plant(1, {50, 50});
+
+    // Candidate 2: has exactly 3 SmallLeaf cells (matches target=3 → deviation 0 → score 255)
+    auto match = make_plant_with_anther(2, {60, 50}, world);
+    world.cell_at({61, 50}).plant_id  = match.id();
+    world.cell_at({61, 50}).cell_type = CellType::SmallLeaf;
+    match.place_cell(CellType::SmallLeaf, {62, 50}, world);
+    match.place_cell(CellType::SmallLeaf, {60, 51}, world);
+    match.place_cell(CellType::SmallLeaf, {60, 49}, world);
+
+    // Candidate 3: has 0 SmallLeaf cells (deviation 3 → score 252)
+    auto nomatch = make_plant_with_anther(3, {40, 50}, world);
+
+    std::vector<Plant> all_plants;
+    all_plants.push_back(std::move(mother));
+    all_plants.push_back(std::move(match));
+    all_plants.push_back(std::move(nomatch));
+
+    MateSearchState search;
+    search.max_distance = 50.0f;
+    // param1=cell_type (SmallLeaf=2), param2=target count (3), magnitude=10
+    search.criteria.push_back({MATE_CRIT_CELL_COUNT, 10,
+                                static_cast<uint8_t>(CellType::SmallLeaf), 3});
+
+    std::mt19937_64 rng(42);
+    uint64_t selected = ReproductionSystem::select_mate(
+        all_plants[0], all_plants, search, rng);
+
+    REQUIRE(selected == 2);  // candidate with matching leaf count wins
+
+    cfg.mate_distance_bias  = orig_bias;
+    cfg.mate_selection_noise = orig_noise;
 }
 
 TEST_CASE("Landing position calculation", "[reproduction]") {
