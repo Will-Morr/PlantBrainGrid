@@ -297,6 +297,87 @@ def make_palette(n: int) -> list:
 
 
 # ---------------------------------------------------------------------------
+# Per-cluster heatmap grid
+# ---------------------------------------------------------------------------
+
+def plot_cluster_heatmaps(
+    xs: np.ndarray,
+    ys: np.ndarray,
+    labels: np.ndarray,
+    n_clusters: int,
+    palette: list,
+    bins: int,
+    output: str | None,
+    dpi: int,
+) -> None:
+    """Plot a grid of 2-D density heatmaps, one tile per cluster."""
+    import math
+    from matplotlib.colors import LinearSegmentedColormap
+
+    if n_clusters == 0:
+        print("[WARN] No clusters to plot heatmaps for.")
+        return
+
+    # Shared spatial extent so every tile uses the same coordinate frame.
+    pad_x = max((xs.max() - xs.min()) * 0.03, 1)
+    pad_y = max((ys.max() - ys.min()) * 0.03, 1)
+    x_range = [float(xs.min() - pad_x), float(xs.max() + pad_x)]
+    y_range = [float(ys.min() - pad_y), float(ys.max() + pad_y)]
+
+    n_cols = math.ceil(math.sqrt(n_clusters))
+    n_rows = math.ceil(n_clusters / n_cols)
+    tile   = 3.0   # inches per tile
+
+    fig, axes = plt.subplots(
+        n_rows, n_cols,
+        figsize=(n_cols * tile, n_rows * tile),
+        squeeze=False,
+    )
+
+    bg = plt.rcParams.get("figure.facecolor", "black")
+
+    for cid in range(n_clusters):
+        row, col = divmod(cid, n_cols)
+        ax = axes[row][col]
+        m  = labels == cid
+
+        H, xedges, yedges = np.histogram2d(
+            xs[m], ys[m], bins=bins, range=[x_range, y_range],
+        )
+        H = H.T   # histogram2d returns H[x,y]; imshow expects H[y,x]
+
+        cmap = LinearSegmentedColormap.from_list(
+            f"c{cid}", [bg, palette[cid]]
+        )
+        ax.imshow(
+            H, origin="lower", aspect="auto", interpolation="bilinear",
+            extent=[x_range[0], x_range[1], y_range[0], y_range[1]],
+            cmap=cmap,
+        )
+        ax.set_title(f"cluster {cid}  (n={int(m.sum())})", fontsize=8, pad=3)
+        ax.tick_params(labelsize=6)
+
+    # Hide any unused grid tiles.
+    for idx in range(n_clusters, n_rows * n_cols):
+        row, col = divmod(idx, n_cols)
+        axes[row][col].set_visible(False)
+
+    fig.suptitle(
+        f"Per-cluster spatial distribution  ({bins}×{bins} bins)",
+        fontsize=11,
+    )
+    plt.tight_layout()
+
+    if output:
+        base, ext = os.path.splitext(output)
+        hm_path = f"{base}_heatmaps{ext or '.png'}"
+        fig.savefig(hm_path, dpi=dpi, bbox_inches="tight")
+        print(f"Saved → {hm_path}")
+    else:
+        plt.show()
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -323,6 +404,10 @@ def main():
     parser.add_argument("--outline-offset", type=float, default=0.0,
                         help="Expand each perimeter ring outward by this many world "
                              "units (negative = shrink); only used with --ball-radius")
+    parser.add_argument("--cluster-heatmaps", action="store_true",
+                        help="Also plot a grid of per-cluster spatial density heatmaps")
+    parser.add_argument("--heatmap-bins", type=int, default=64,
+                        help="Histogram bins along each axis for --cluster-heatmaps")
     parser.add_argument("--point-size", type=float, default=8.0,
                         help="Marker area in points²")
     parser.add_argument("--output", default=None,
@@ -463,6 +548,14 @@ def main():
         print(f"Saved → {args.output}")
     else:
         plt.show()
+
+    if args.cluster_heatmaps:
+        plot_cluster_heatmaps(
+            xs, ys, labels, n_clusters, palette,
+            bins=args.heatmap_bins,
+            output=args.output,
+            dpi=args.dpi,
+        )
 
 
 if __name__ == "__main__":
