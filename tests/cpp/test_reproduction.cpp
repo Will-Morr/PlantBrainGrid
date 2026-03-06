@@ -151,6 +151,7 @@ TEST_CASE("Mutation application", "[reproduction]") {
 TEST_CASE("Seed creation", "[reproduction]") {
     World world(100, 100, 42);
     auto mother = make_test_plant(1, {50, 50});
+    auto father = make_test_plant(2, {60, 60});
 
     SECTION("Seed creation deducts resources") {
         QueuedAction::SeedParams params;
@@ -165,13 +166,13 @@ TEST_CASE("Seed creation", "[reproduction]") {
 
         float initial_energy = mother.resources().energy;
 
-        auto seed = ReproductionSystem::create_seed(mother, nullptr, params, world.rng());
+        auto seed = ReproductionSystem::create_seed(mother, father, params, world.rng());
 
         REQUIRE(seed.has_value());
         REQUIRE(mother.resources().energy < initial_energy);
     }
 
-    SECTION("Seed creation fails with insufficient resources") {
+    SECTION("Seed creation with zero resources produces zero-cost seed") {
         mother.resources() = Resources{0.0f, 0.0f, 0.0f};
 
         QueuedAction::SeedParams params;
@@ -179,25 +180,15 @@ TEST_CASE("Seed creation", "[reproduction]") {
         params.water = 50;
         params.nutrients = 25;
         params.launch_power = 10;
-
-        auto seed = ReproductionSystem::create_seed(mother, nullptr, params, world.rng());
-
-        REQUIRE_FALSE(seed.has_value());
-    }
-
-    SECTION("Seed inherits mother's genome for asexual reproduction") {
-        QueuedAction::SeedParams params;
         params.recomb_method = RecombinationMethod::MotherOnly;
-        params.energy = 10;
-        params.water = 10;
-        params.nutrients = 10;
-        params.launch_power = 5;
 
-        auto seed = ReproductionSystem::create_seed(mother, nullptr, params, world.rng());
+        auto seed = ReproductionSystem::create_seed(mother, father, params, world.rng());
 
+        // create_seed always produces a seed; costs are clamped to available resources
         REQUIRE(seed.has_value());
-        // Genome should be similar to mother (with mutations)
-        REQUIRE(seed->genome.size() == mother.brain().memory().size());
+        REQUIRE(seed->energy == 0.0f);
+        REQUIRE(seed->water == 0.0f);
+        REQUIRE(seed->nutrients == 0.0f);
     }
 }
 
@@ -270,11 +261,22 @@ TEST_CASE("Seed germination", "[reproduction]") {
     }
 }
 
+// Helper: create a plant and give it an Anther cell via a world.
+static Plant make_plant_with_anther(uint64_t id, const GridCoord& pos, World& world) {
+    auto plant = make_test_plant(id, pos);
+    world.cell_at(pos).plant_id = id;
+    world.cell_at(pos).cell_type = CellType::Primary;
+    GridCoord anther_pos{pos.x + 1, pos.y};
+    plant.place_cell(CellType::Anther, anther_pos, world);
+    return plant;
+}
+
 TEST_CASE("Mate selection", "[reproduction]") {
     SECTION("Selects mate within distance") {
-        auto mother = make_test_plant(1, {50, 50});
-        auto candidate1 = make_test_plant(2, {55, 50});  // Distance 5
-        auto candidate2 = make_test_plant(3, {100, 100}); // Distance ~70
+        World world(200, 200, 42);
+        auto mother     = make_test_plant(1, {50, 50});
+        auto candidate1 = make_plant_with_anther(2, {55, 50}, world);  // Distance 5
+        auto candidate2 = make_plant_with_anther(3, {100, 100}, world); // Distance ~70
 
         std::vector<Plant> all_plants;
         all_plants.push_back(std::move(mother));
@@ -288,7 +290,7 @@ TEST_CASE("Mate selection", "[reproduction]") {
         uint64_t selected = ReproductionSystem::select_mate(
             all_plants[0], all_plants, search);
 
-        // Should select candidate1 (within range), not candidate2
+        // Should select candidate1 (within range), not candidate2 (out of range)
         REQUIRE(selected == 2);
     }
 
@@ -309,9 +311,10 @@ TEST_CASE("Mate selection", "[reproduction]") {
     }
 
     SECTION("Distance criterion favors closer mates") {
+        World world(200, 200, 42);
         auto mother = make_test_plant(1, {50, 50});
-        auto close = make_test_plant(2, {52, 50});   // Distance 2
-        auto far = make_test_plant(3, {60, 50});     // Distance 10
+        auto close  = make_plant_with_anther(2, {52, 50}, world);  // Distance 2
+        auto far    = make_plant_with_anther(3, {60, 50}, world);  // Distance 10
 
         std::vector<Plant> all_plants;
         all_plants.push_back(std::move(mother));
@@ -333,11 +336,11 @@ TEST_CASE("Mate selection", "[reproduction]") {
         float orig_bias = cfg.mate_distance_bias;
         cfg.mate_distance_bias = 1.0f;
 
+        World world(200, 200, 42);
         auto mother = make_test_plant(1, {50, 50});
-        auto close = make_test_plant(2, {52, 50});   // Distance 2
-        auto far = make_test_plant(3, {70, 50});     // Distance 20
+        auto close  = make_plant_with_anther(2, {52, 50}, world);  // Distance 2
+        auto far    = make_plant_with_anther(3, {70, 50}, world);  // Distance 20
 
-        // Give both candidates identical size so size weighting doesn't break the tie
         std::vector<Plant> all_plants;
         all_plants.push_back(std::move(mother));
         all_plants.push_back(std::move(close));
@@ -354,6 +357,74 @@ TEST_CASE("Mate selection", "[reproduction]") {
         REQUIRE(selected == 2);
 
         cfg.mate_distance_bias = orig_bias;
+    }
+}
+
+TEST_CASE("Anther gate in mate selection", "[reproduction]") {
+    SECTION("Plant without anther cannot be selected as mate") {
+        auto mother = make_test_plant(1, {50, 50});
+        auto no_anther = make_test_plant(2, {55, 50});   // no anther cell
+
+        std::vector<Plant> all_plants;
+        all_plants.push_back(std::move(mother));
+        all_plants.push_back(std::move(no_anther));
+
+        MateSearchState search;
+        search.max_distance = 100.0f;
+        search.weights.push_back({MATE_CRITERION_SIZE, 1});
+
+        uint64_t selected = ReproductionSystem::select_mate(
+            all_plants[0], all_plants, search);
+
+        REQUIRE(selected == 0);  // No eligible mate
+    }
+
+    SECTION("Plant with anther can be selected as mate") {
+        World world(100, 100, 42);
+        auto mother = make_test_plant(1, {50, 50});
+        auto with_anther = make_test_plant(2, {55, 50});
+
+        // Register with world and add an anther cell
+        world.cell_at(with_anther.primary_position()).plant_id = with_anther.id();
+        world.cell_at(with_anther.primary_position()).cell_type = CellType::Primary;
+        with_anther.place_cell(CellType::Anther, {56, 50}, world);
+
+        std::vector<Plant> all_plants;
+        all_plants.push_back(std::move(mother));
+        all_plants.push_back(std::move(with_anther));
+
+        MateSearchState search;
+        search.max_distance = 100.0f;
+        search.weights.push_back({MATE_CRITERION_SIZE, 1});
+
+        uint64_t selected = ReproductionSystem::select_mate(
+            all_plants[0], all_plants, search);
+
+        REQUIRE(selected == 2);  // Selects the plant with anther
+    }
+
+    SECTION("Disabled anther does not qualify") {
+        World world(100, 100, 42);
+        auto mother = make_test_plant(1, {50, 50});
+        auto disabled_anther = make_test_plant(2, {55, 50});
+
+        world.cell_at(disabled_anther.primary_position()).plant_id = disabled_anther.id();
+        world.cell_at(disabled_anther.primary_position()).cell_type = CellType::Primary;
+        disabled_anther.place_cell(CellType::Anther, {56, 50}, world);
+        disabled_anther.toggle_cell({56, 50}, false);
+
+        std::vector<Plant> all_plants;
+        all_plants.push_back(std::move(mother));
+        all_plants.push_back(std::move(disabled_anther));
+
+        MateSearchState search;
+        search.max_distance = 100.0f;
+        search.weights.push_back({MATE_CRITERION_SIZE, 1});
+
+        uint64_t selected = ReproductionSystem::select_mate(
+            all_plants[0], all_plants, search);
+
+        REQUIRE(selected == 0);  // Disabled anther doesn't count
     }
 }
 

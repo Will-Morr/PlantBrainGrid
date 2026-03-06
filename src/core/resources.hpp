@@ -3,19 +3,10 @@
 #include "core/types.hpp"
 #include "core/plant.hpp"
 #include <vector>
-#include <unordered_map>
-#include <unordered_set>
 
 namespace pbg {
 
 class World;
-
-// Tracks resources at each cell during flow calculation
-struct CellResources {
-    float energy = 0.0f;
-    float water = 0.0f;
-    float nutrients = 0.0f;
-};
 
 // Result of resource tick for debugging/visualization
 struct ResourceTickResult {
@@ -25,7 +16,6 @@ struct ResourceTickResult {
     float energy_maintenance = 0.0f;
     float water_maintenance = 0.0f;
     float nutrients_maintenance = 0.0f;
-    float xylem_transfer_loss = 0.0f;
     float net_energy = 0.0f;
     float net_water = 0.0f;
     float net_nutrients = 0.0f;
@@ -48,22 +38,6 @@ public:
 
     // Calculate total maintenance costs
     static Resources calculate_maintenance(const Plant& plant);
-
-    // Process xylem flow - moves resources toward primary cell
-    // Returns total resources that reached primary cell
-    static Resources process_xylem_flow(Plant& plant, World& world);
-
-private:
-    // Build adjacency graph of plant cells
-    static std::unordered_map<GridCoord, std::vector<GridCoord>>
-        build_adjacency_graph(const Plant& plant);
-
-    // Find shortest path from a cell to the nearest anchor (primary or xylem) using BFS.
-    // Xylem cells act as relay points equivalent to the primary for distance purposes.
-    static std::vector<GridCoord> find_path_to_primary(
-        const GridCoord& start,
-        const std::unordered_set<GridCoord>& anchors,
-        const std::unordered_map<GridCoord, std::vector<GridCoord>>& adj);
 };
 
 }  // namespace pbg

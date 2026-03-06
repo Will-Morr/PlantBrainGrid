@@ -120,7 +120,7 @@ TEST_CASE("Plant cell toggle", "[plant]") {
 
     world.cell_at(50, 50).plant_id = plant.id();
     world.cell_at(50, 50).cell_type = CellType::Primary;
-    plant.place_cell(CellType::Xylem, {51, 50}, world);
+    plant.place_cell(CellType::Anther, {51, 50}, world);
 
     SECTION("Can toggle cell enabled state") {
         PlantCell* cell = plant.find_cell({51, 50});
@@ -251,12 +251,24 @@ TEST_CASE("Placement resource requirements", "[plant]") {
     }
 
     SECTION("BigLeaf: water is not required to build (build_water == 0)") {
-        // No cell type has a non-zero water build cost; BigLeaf confirms this.
         World world(100, 100, 42);
         const CellCosts& cost = get_cell_costs(CellType::BigLeaf);
         REQUIRE(cost.build_water == 0.0f);
         auto plant = setup(world, cost.build_energy, 0.0f, cost.build_nutrients);
         REQUIRE(plant.can_place_cell(CellType::BigLeaf, {51, 50}, world));
+    }
+
+    SECTION("Bark: requires water and nutrients to build") {
+        World world(100, 100, 42);
+        const CellCosts& cost = get_cell_costs(CellType::Bark);
+        REQUIRE(cost.build_water > 0.0f);
+        REQUIRE(cost.build_nutrients > 0.0f);
+        // Sufficient resources
+        auto plant = setup(world, 100.0f, cost.build_water, cost.build_nutrients);
+        REQUIRE(plant.can_place_cell(CellType::Bark, {51, 50}, world));
+        // Insufficient water
+        auto plant2 = setup(world, 100.0f, cost.build_water - 0.01f, cost.build_nutrients);
+        REQUIRE_FALSE(plant2.can_place_cell(CellType::Bark, {51, 50}, world));
     }
 }
 

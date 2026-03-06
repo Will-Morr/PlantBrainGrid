@@ -35,8 +35,8 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .value("BigLeaf", CellType::BigLeaf)
         .value("FiberRoot", CellType::FiberRoot)
         .value("TapRoot", CellType::TapRoot)
-        .value("Xylem", CellType::Xylem)
-        .value("FireproofXylem", CellType::FireproofXylem)
+        .value("Anther", CellType::Anther)
+        .value("Bark", CellType::Bark)
         .value("Thorn", CellType::Thorn)
         .value("FireStarter", CellType::FireStarter);
 
@@ -74,7 +74,6 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def_readwrite("mutation_block_min_size", &Config::mutation_block_min_size)
         .def_readwrite("mutation_block_max_size", &Config::mutation_block_max_size)
         .def_readwrite("season_length", &Config::season_length)
-        .def_readwrite("xylem_transfer_cost", &Config::xylem_transfer_cost)
         .def_readwrite("fire_spread_ticks", &Config::fire_spread_ticks)
         .def_readwrite("fire_destroy_ticks", &Config::fire_destroy_ticks)
         .def_readwrite("primary_costs", &Config::primary_costs)
@@ -82,8 +81,8 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def_readwrite("big_leaf_costs", &Config::big_leaf_costs)
         .def_readwrite("fiber_root_costs", &Config::fiber_root_costs)
         .def_readwrite("tap_root_costs", &Config::tap_root_costs)
-        .def_readwrite("xylem_costs", &Config::xylem_costs)
-        .def_readwrite("fireproof_xylem_costs", &Config::fireproof_xylem_costs)
+        .def_readwrite("anther_costs", &Config::anther_costs)
+        .def_readwrite("bark_costs", &Config::bark_costs)
         .def_readwrite("thorn_costs", &Config::thorn_costs)
         .def_readwrite("fire_starter_costs", &Config::fire_starter_costs);
 
@@ -132,7 +131,7 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def_readonly("position", &PlantCell::position)
         .def_readonly("enabled", &PlantCell::enabled)
         .def_readonly("plant_id", &PlantCell::plant_id)
-        .def("is_xylem", &PlantCell::is_xylem)
+        .def("is_anther", &PlantCell::is_anther)
         .def("is_leaf", &PlantCell::is_leaf);
 
     // Brain (partial exposure for inspection)

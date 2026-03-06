@@ -54,8 +54,8 @@ enum class CellType : uint8_t {
     SmallLeaf = 2,
     BigLeaf = 3,
     FiberRoot = 4,
-    Xylem = 5,
-    FireproofXylem = 6,
+    Anther = 5,
+    Bark = 6,
     Thorn = 7,
     FireStarter = 8,
     TapRoot = 9

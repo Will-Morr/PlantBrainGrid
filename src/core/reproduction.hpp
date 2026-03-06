@@ -55,10 +55,10 @@ public:
         float mutation_rate,
         std::mt19937_64& rng);
 
-    // Create a seed from reproduction parameters
+    // Create a seed from reproduction parameters (father required for sexual reproduction)
     static std::optional<Seed> create_seed(
         Plant& mother,
-        const Plant* father,  // Can be null for asexual reproduction
+        const Plant& father,
         const QueuedAction::SeedParams& params,
         std::mt19937_64& rng);
 

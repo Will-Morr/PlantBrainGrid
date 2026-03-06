@@ -35,7 +35,6 @@ struct Config {
     float instruction_limit_penalty = 5.0f;
 
     // Resources (income rates)
-    float xylem_transfer_cost = 0.05f;
     float small_leaf_energy_rate = 1.0f;
     float big_leaf_energy_rate = 5.0f;
     float big_leaf_water_cost = 2.0f;
@@ -53,8 +52,8 @@ struct Config {
     CellCosts big_leaf_costs        = { 25,  0,   10,  0,     0.4,  0.3 };
     CellCosts fiber_root_costs      = { 8,   0,   0,   0.2,   0,    0   };
     CellCosts tap_root_costs        = { 12,  0,   0,   0.1,   0,    0   };
-    CellCosts xylem_costs           = { 12,  0,   0,   0.05,  0,    0   };
-    CellCosts fireproof_xylem_costs = { 5,   0,   20,  0.05,  0,    0   };
+    CellCosts anther_costs          = { 10,  0,   0,   0.2,   0,    0   };
+    CellCosts bark_costs            = { 0,   1,   1,   0,     0.01, 0.01};
     CellCosts thorn_costs           = { 5,   0,   0,   0,     0.01, 0   };
     CellCosts fire_starter_costs    = { 30,  0,   0,   0,     0,    0   };
     

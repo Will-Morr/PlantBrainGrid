@@ -25,8 +25,8 @@ CELL_COLORS = {
     2: (34, 139, 34),     # SmallLeaf (green)
     3: (0, 100, 0),       # BigLeaf (dark green)
     4: (139, 90, 43),     # FiberRoot (sienna)
-    5: (210, 180, 140),   # Xylem (tan)
-    6: (255, 215, 0),     # FireproofXylem (gold)
+    5: (255, 220, 50),    # Anther (pollen yellow)
+    6: (101, 67, 33),     # Bark (dark brown)
     7: (128, 128, 128),   # Thorn (gray)
     8: (255, 69, 0),      # FireStarter (red-orange)
     9: (110, 55, 90),     # TapRoot (purplish brown)
@@ -365,8 +365,8 @@ class Visualizer:
             (CellType.BigLeaf,       "BigLeaf",        (0, 100, 0)),
             (CellType.FiberRoot,     "FiberRoot",      (139, 90, 43)),
             (CellType.TapRoot,       "TapRoot",        (110, 55, 90)),
-            (CellType.Xylem,         "Xylem",          (210, 180, 140)),
-            (CellType.FireproofXylem,"FproofXylem",    (255, 215, 0)),
+            (CellType.Anther,        "Anther",          (255, 220, 50)),
+            (CellType.Bark,          "Bark",            (101, 67, 33)),
             (CellType.Thorn,         "Thorn",          (128, 128, 128)),
             (CellType.FireStarter,   "FireStarter",    (255, 69, 0)),
         ]

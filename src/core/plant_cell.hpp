@@ -17,8 +17,8 @@ struct PlantCell {
     PlantCell(CellType type_, const GridCoord& pos_)
         : type(type_), position(pos_) {}
 
-    bool is_xylem() const {
-        return type == CellType::Xylem || type == CellType::FireproofXylem;
+    bool is_anther() const {
+        return type == CellType::Anther;
     }
 
     bool is_leaf() const {
@@ -26,7 +26,7 @@ struct PlantCell {
     }
 
     bool is_fireproof() const {
-        return type == CellType::FireproofXylem;
+        return type == CellType::Bark;
     }
 
     bool blocks_placement() const {

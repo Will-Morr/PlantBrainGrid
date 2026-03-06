@@ -266,64 +266,80 @@ TEST_CASE("Full resource tick", "[resources]") {
         REQUIRE(plant.resources().energy == initial_energy);
     }
 
-    SECTION("Resources don't go negative") {
+    SECTION("Maintenance is deducted from resources each tick") {
         auto plant = make_test_plant();
-        plant.resources() = Resources{0.0f, 0.0f, 0.0f};  // Start with nothing
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
+        // Start with ample resources so maintenance is the only change
+        plant.resources() = Resources{1000.0f, 1000.0f, 1000.0f};
 
+        float energy_before = plant.resources().energy;
         ResourceSystem::process_tick(plant, world);
 
-        REQUIRE(plant.resources().energy >= 0.0f);
-        REQUIRE(plant.resources().water >= 0.0f);
-        REQUIRE(plant.resources().nutrients >= 0.0f);
+        // Primary cell has energy maintenance cost; energy must decrease
+        REQUIRE(plant.resources().energy < energy_before);
     }
 }
 
-TEST_CASE("Xylem flow", "[resources]") {
+TEST_CASE("Anther maintenance cost", "[resources]") {
     World world(100, 100, 42);
     auto& cfg = get_config();
 
-    SECTION("Enabled xylem costs resources to operate") {
+    SECTION("Anther cell has energy maintenance cost") {
         auto plant = make_test_plant();
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
-        // Add xylem
-        plant.place_cell(CellType::Xylem, {51, 50}, world);
+        plant.place_cell(CellType::Anther, {51, 50}, world);
 
-        float initial_energy = plant.resources().energy;
+        Resources maintenance = ResourceSystem::calculate_maintenance(plant);
 
-        Resources loss = ResourceSystem::process_xylem_flow(plant, world);
-
-        REQUIRE(plant.resources().energy < initial_energy);
+        REQUIRE(maintenance.energy >= cfg.primary_costs.maintain_energy + cfg.anther_costs.maintain_energy);
     }
 
-    SECTION("Disabled xylem doesn't cost resources") {
+    SECTION("Anther energy maintenance matches config") {
         auto plant = make_test_plant();
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
-        plant.place_cell(CellType::Xylem, {51, 50}, world);
-        plant.toggle_cell({51, 50}, false);
+        Resources base = ResourceSystem::calculate_maintenance(plant);
+        plant.place_cell(CellType::Anther, {51, 50}, world);
+        Resources with_anther = ResourceSystem::calculate_maintenance(plant);
 
-        float initial_energy = plant.resources().energy;
+        float delta = with_anther.energy - base.energy;
+        REQUIRE_THAT(delta, WithinAbs(cfg.anther_costs.maintain_energy, 0.001f));
+    }
+}
 
-        Resources loss = ResourceSystem::process_xylem_flow(plant, world);
+TEST_CASE("Bark maintenance cost", "[resources]") {
+    World world(100, 100, 42);
+    auto& cfg = get_config();
 
-        REQUIRE(plant.resources().energy == initial_energy);
+    SECTION("Bark cell has water and nutrient maintenance cost") {
+        auto plant = make_test_plant();
+        world.cell_at(plant.primary_position()).plant_id = plant.id();
+        world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
+
+        Resources base = ResourceSystem::calculate_maintenance(plant);
+        plant.place_cell(CellType::Bark, {51, 50}, world);
+        Resources with_bark = ResourceSystem::calculate_maintenance(plant);
+
+        float water_delta = with_bark.water - base.water;
+        float nutrient_delta = with_bark.nutrients - base.nutrients;
+        REQUIRE_THAT(water_delta,    WithinAbs(cfg.bark_costs.maintain_water,     0.001f));
+        REQUIRE_THAT(nutrient_delta, WithinAbs(cfg.bark_costs.maintain_nutrients, 0.001f));
     }
 
-    SECTION("FireproofXylem also costs resources") {
+    SECTION("Bark has no energy maintenance cost") {
         auto plant = make_test_plant();
         world.cell_at(plant.primary_position()).plant_id = plant.id();
         world.cell_at(plant.primary_position()).cell_type = CellType::Primary;
 
-        plant.place_cell(CellType::FireproofXylem, {51, 50}, world);
+        Resources base = ResourceSystem::calculate_maintenance(plant);
+        plant.place_cell(CellType::Bark, {51, 50}, world);
+        Resources with_bark = ResourceSystem::calculate_maintenance(plant);
 
-        float initial_energy = plant.resources().energy;
-
-        Resources loss = ResourceSystem::process_xylem_flow(plant, world);
-
-        REQUIRE(plant.resources().energy < initial_energy);
+        REQUIRE(with_bark.energy == base.energy);
     }
 }
 

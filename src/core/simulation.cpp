@@ -172,14 +172,14 @@ Simulation::collect_all_actions() {
                 all_actions[action.position].emplace_back(plant.id(), std::move(action));
             } else if (action.type == ActionType::LaunchSeed) {
                 if (action.seed_params) {
-                    const Plant* father = nullptr;
-                    if (plant.brain().mate_search().selected_mate_id != 0) {
-                        father = find_plant(plant.brain().mate_search().selected_mate_id);
-                    }
-                    auto seed = ReproductionSystem::create_seed(
-                        plant, father, *action.seed_params, world_.rng());
-                    if (seed) {
-                        add_seed(std::move(*seed));
+                    uint64_t mate_id = plant.brain().mate_search().selected_mate_id;
+                    const Plant* father = (mate_id != 0) ? find_plant(mate_id) : nullptr;
+                    if (father) {
+                        auto seed = ReproductionSystem::create_seed(
+                            plant, *father, *action.seed_params, world_.rng());
+                        if (seed) {
+                            add_seed(std::move(*seed));
+                        }
                     }
                 }
             } else {
@@ -307,7 +307,7 @@ void Simulation::process_resources() {
 void Simulation::check_starvation() {
     for (auto& plant : plants_) {
         if (!plant.is_alive()) continue;
-        if (plant.resources().energy < 0.0f || plant.resources().water < 0.0f || plant.resources().nutrients < 0.0f) {
+        if (plant.resources().energy < 0.0f || plant.resources().water < 0.0f) {
             plant.kill();
         }
     }

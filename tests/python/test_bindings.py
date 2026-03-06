@@ -52,7 +52,7 @@ def test_gridcoord_repr():
 def test_cell_type_enum():
     assert pbg.CellType.Empty != pbg.CellType.Primary
     assert pbg.CellType.SmallLeaf != pbg.CellType.BigLeaf
-    assert pbg.CellType.FiberRoot != pbg.CellType.Xylem
+    assert pbg.CellType.FiberRoot != pbg.CellType.Anther
 
 
 def test_recombination_method_enum():

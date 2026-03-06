@@ -65,7 +65,7 @@ NUM_OPCODES = 0xA0
 
 CELL_TYPE_NAMES = {
     0: "Empty", 1: "Primary", 2: "SmallLeaf", 3: "BigLeaf",
-    4: "Root", 5: "Xylem", 6: "FireproofXylem", 7: "Thorn", 8: "FireStarter"
+    4: "Root", 5: "Anther", 6: "Bark", 7: "Thorn", 8: "FireStarter"
 }
 
 DIRECTION_NAMES = {0: "North", 1: "East", 2: "South", 3: "West"}

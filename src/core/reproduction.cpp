@@ -26,6 +26,18 @@ uint64_t ReproductionSystem::select_mate(
             continue;
         }
 
+        // Only allow candidates that have at least one enabled Anther cell
+        bool has_anther = false;
+        for (const auto& cell : candidate.cells()) {
+            if (cell.type == CellType::Anther && cell.enabled) {
+                has_anther = true;
+                break;
+            }
+        }
+        if (!has_anther) {
+            continue;
+        }
+
         // Check distance
         float dx = static_cast<float>(candidate.primary_position().x - mother.primary_position().x);
         float dy = static_cast<float>(candidate.primary_position().y - mother.primary_position().y);
@@ -210,7 +222,7 @@ void ReproductionSystem::apply_mutations(
 
 std::optional<Seed> ReproductionSystem::create_seed(
     Plant& mother,
-    const Plant* father,
+    const Plant& father,
     const QueuedAction::SeedParams& params,
     std::mt19937_64& rng)
 {
@@ -222,7 +234,7 @@ std::optional<Seed> ReproductionSystem::create_seed(
     float nutrient_cost = static_cast<float>(params.nutrients) / cfg.resource_sense_scale;
     float launch_cost = static_cast<float>(params.launch_power);
 
-    // Reduce cost father can't afford full launch
+    // Reduce cost if mother can't afford full launch
     launch_cost = std::min(launch_cost, mother.resources().energy);
     mother.resources().energy -= launch_cost;
 
@@ -236,17 +248,12 @@ std::optional<Seed> ReproductionSystem::create_seed(
     mother.resources().water -= water_cost;
     mother.resources().nutrients -= nutrient_cost;
 
-    // Create offspring genome
-    std::vector<uint8_t> offspring_genome;
-    if (father) {
-        offspring_genome = recombine_genomes(
-            mother.brain().memory(),
-            father->brain().memory(),
-            params.recomb_method,
-            rng);
-    } else {
-        offspring_genome = mother.brain().memory();
-    }
+    // Create offspring genome via recombination
+    std::vector<uint8_t> offspring_genome = recombine_genomes(
+        mother.brain().memory(),
+        father.brain().memory(),
+        params.recomb_method,
+        rng);
 
     // Apply mutations
     apply_mutations(offspring_genome, cfg.mutation_rate, rng);
@@ -258,7 +265,7 @@ std::optional<Seed> ReproductionSystem::create_seed(
     seed.water = water_cost;
     seed.nutrients = nutrient_cost;
     seed.mother_id = mother.id();
-    seed.father_id = father ? father->id() : 0;
+    seed.father_id = father.id();
     seed.position = mother.primary_position();
 
     // Calculate landing position

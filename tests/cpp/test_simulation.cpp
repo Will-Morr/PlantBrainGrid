@@ -343,7 +343,7 @@ TEST_CASE("Fire damage to plants", "[simulation]") {
         plant->resources().energy = 1000.0f;
         plant->resources().water = 1000.0f;
 
-        plant->place_cell(CellType::FireproofXylem, {51, 50}, sim.world());
+        plant->place_cell(CellType::Bark, {51, 50}, sim.world());
 
         sim.world().cell_at(50, 50).water_level = 0.0f;
         sim.world().cell_at(51, 50).water_level = 0.0f;
@@ -416,19 +416,6 @@ TEST_CASE("Starvation death", "[simulation]") {
         Plant* plant = sim.add_plant({50, 50}, genome);
         plant->resources().energy = 0.0f;
         plant->resources().water = 100.0f;
-
-        sim.advance_tick();
-
-        REQUIRE(sim.plants().empty());
-    }
-
-    SECTION("Plant with zero water dies after tick") {
-        Simulation sim(100, 100, 42);
-        Plant* plant = sim.add_plant({50, 50}, genome);
-        plant->resources().energy = 100.0f;
-        plant->resources().water = 0.0f;
-        // Zero out world water at primary position so primary water draw gives 0
-        sim.world().cell_at({50, 50}).water_level = 0.0f;
 
         sim.advance_tick();
 

@@ -1,8 +1,6 @@
 #include "core/resources.hpp"
 #include "core/world.hpp"
 #include "core/config.hpp"
-#include <queue>
-#include <unordered_set>
 #include <algorithm>
 
 namespace pbg {
@@ -31,14 +29,7 @@ ResourceTickResult ResourceSystem::process_tick(Plant& plant, World& world) {
     plant.resources().water += result.water_extracted;
     plant.resources().nutrients += result.nutrients_extracted;
 
-    // 3. Process xylem flow (resources move through enabled xylem)
-    // Note: In this simplified model, we assume resources generated at
-    // leaves/roots are added directly to the plant pool. Xylem affects
-    // efficiency based on connectivity.
-    Resources xylem_bonus = process_xylem_flow(plant, world);
-    result.xylem_transfer_loss = xylem_bonus.energy;  // Track loss, not bonus
-
-    // 4. Pay maintenance costs
+    // 3. Pay maintenance costs
     Resources maintenance = calculate_maintenance(plant);
     result.energy_maintenance = maintenance.energy;
     result.water_maintenance = maintenance.water;
@@ -127,103 +118,6 @@ Resources ResourceSystem::calculate_maintenance(const Plant& plant) {
     }
 
     return total;
-}
-
-std::unordered_map<GridCoord, std::vector<GridCoord>>
-ResourceSystem::build_adjacency_graph(const Plant& plant) {
-    std::unordered_map<GridCoord, std::vector<GridCoord>> adj;
-    std::unordered_set<GridCoord> cell_positions;
-
-    // Collect all cell positions
-    for (const auto& cell : plant.cells()) {
-        cell_positions.insert(cell.position);
-        adj[cell.position] = {};
-    }
-
-    // Build adjacency
-    static const GridCoord offsets[] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
-    for (const auto& cell : plant.cells()) {
-        for (const auto& offset : offsets) {
-            GridCoord neighbor = cell.position + offset;
-            if (cell_positions.count(neighbor)) {
-                adj[cell.position].push_back(neighbor);
-            }
-        }
-    }
-
-    return adj;
-}
-
-std::vector<GridCoord> ResourceSystem::find_path_to_primary(
-    const GridCoord& start,
-    const std::unordered_set<GridCoord>& anchors,
-    const std::unordered_map<GridCoord, std::vector<GridCoord>>& adj)
-{
-    // Anchors are the primary cell plus all xylem cells — xylem acts as relay
-    // nodes equivalent to the primary for distance calculation.
-    if (anchors.count(start)) {
-        return {start};
-    }
-
-    std::unordered_map<GridCoord, GridCoord> parent;
-    std::queue<GridCoord> queue;
-    std::unordered_set<GridCoord> visited;
-
-    queue.push(start);
-    visited.insert(start);
-
-    while (!queue.empty()) {
-        GridCoord current = queue.front();
-        queue.pop();
-
-        if (anchors.count(current)) {
-            // Reconstruct path
-            std::vector<GridCoord> path;
-            GridCoord node = current;
-            while (node != start) {
-                path.push_back(node);
-                node = parent[node];
-            }
-            path.push_back(start);
-            std::reverse(path.begin(), path.end());
-            return path;
-        }
-
-        auto it = adj.find(current);
-        if (it != adj.end()) {
-            for (const auto& neighbor : it->second) {
-                if (visited.count(neighbor) == 0) {
-                    visited.insert(neighbor);
-                    parent[neighbor] = current;
-                    queue.push(neighbor);
-                }
-            }
-        }
-    }
-
-    // No path found
-    return {};
-}
-
-Resources ResourceSystem::process_xylem_flow(Plant& plant, World& /*world*/) {
-    const auto& cfg = get_config();
-    Resources total_loss;
-
-    // For each xylem cell that is enabled, calculate flow efficiency
-    // Xylem improves resource transport but costs some resources per hop
-    int enabled_xylem_count = 0;
-    for (const auto& cell : plant.cells()) {
-        if (cell.enabled && cell.is_xylem()) {
-            ++enabled_xylem_count;
-            // Each active xylem costs a small amount of the throughput
-            total_loss.energy += cfg.xylem_transfer_cost;
-        }
-    }
-
-    // Deduct xylem operation cost from plant resources
-    plant.resources().energy -= total_loss.energy;
-
-    return total_loss;
 }
 
 }  // namespace pbg

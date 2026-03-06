@@ -19,7 +19,7 @@ struct WorldCell {
 
     bool is_on_fire() const { return fire_ticks > 0; }
     bool is_occupied() const { return plant_id != 0; }
-    bool is_fireproof() const { return cell_type == CellType::FireproofXylem; }
+    bool is_fireproof() const { return cell_type == CellType::Bark; }
     bool blocks_placement() const { return cell_type == CellType::Thorn; }
 };
 

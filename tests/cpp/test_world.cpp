@@ -264,7 +264,7 @@ TEST_CASE("World fire system", "[world]") {
         GridCoord right{11, 10};
 
         world.cell_at(center).plant_id = 1; world.cell_at(center).cell_type = CellType::SmallLeaf;
-        world.cell_at(right).plant_id = 1;  world.cell_at(right).cell_type = CellType::FireproofXylem;
+        world.cell_at(right).plant_id = 1;  world.cell_at(right).cell_type = CellType::Bark;
 
         world.cell_at(center).water_level = 0.0f;
         world.cell_at(right).water_level = 0.0f;
