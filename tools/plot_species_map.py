@@ -373,7 +373,6 @@ def main():
     ax.set_xlabel("World X", fontsize=11)
     ax.set_ylabel("World Y", fontsize=11)
     ax.set_aspect("equal", adjustable="datalim")
-    ax.invert_yaxis()   # row 0 at top, matches world grid convention
 
     title_parts = [
         f"{N} plants",
