@@ -16,20 +16,20 @@ Usage:
     python tools/plot_species_map.py logs/ --eps 150
     python tools/plot_species_map.py logs/ --min-ticks-lived 100 --output species.png
     python tools/plot_species_map.py logs/ --eps 80 --min-samples 3 --point-size 12
-    python tools/plot_species_map.py logs/ --perimeter
-    python tools/plot_species_map.py logs/ --perimeter --ball-radius 20
+    python tools/plot_species_map.py logs/ --ball-radius 20
+    python tools/plot_species_map.py logs/ --ball-radius 0  # auto radius
 
 --eps is the maximum number of bytes two genomes may differ and still be
 considered the same species.  Tune it relative to genome length (1024 bytes):
   tight clusters   →  small eps  (e.g. 50–100)
   loose / species  →  large eps  (e.g. 200–400)
 
---ball-radius controls the perimeter (2D ball pivot / alpha shape).  The ball
-is a circle rolled over the Delaunay triangulation of each cluster's plant
-positions; boundary edges are those shared by only one triangle whose
+--ball-radius enables perimeter drawing (2D ball pivot / alpha shape).  The
+ball is a circle rolled over the Delaunay triangulation of each cluster's
+plant positions; boundary edges are those shared by only one triangle whose
 circumradius ≤ ball-radius.  Larger radius = looser / convex-hull-like
 boundary; smaller radius = tighter, can split into multiple rings.
-Defaults to 3× the average nearest-neighbour distance within each cluster.
+Pass 0 to use auto radius (3× average nearest-neighbour distance per cluster).
 
 Requirements:
     pip install pyarrow numpy matplotlib scikit-learn scipy
@@ -261,10 +261,9 @@ def main():
                         help="Subsample randomly if more plants than this")
     parser.add_argument("--no-noise", action="store_true",
                         help="Hide unclustered noise points (DBSCAN label -1)")
-    parser.add_argument("--perimeter", action="store_true",
-                        help="Draw a 2-D ball-pivot boundary around each cluster")
     parser.add_argument("--ball-radius", type=float, default=None,
-                        help="Ball radius for perimeter (default: auto per cluster)")
+                        help="Enable perimeter outlines; ball radius in world units "
+                             "(0 = auto: 3× avg nearest-neighbour distance per cluster)")
     parser.add_argument("--point-size", type=float, default=8.0,
                         help="Marker area in points²")
     parser.add_argument("--output", default=None,
@@ -362,10 +361,9 @@ def main():
                    s=args.point_size, linewidths=0, alpha=0.85,
                    zorder=2, label=f"cluster {cid}  (n={m.sum()})")
 
-        if args.perimeter and m.sum() >= 3:
+        if args.ball_radius is not None and m.sum() >= 3:
             pts = np.column_stack([xs[m], ys[m]])
-            radius = args.ball_radius if args.ball_radius is not None \
-                     else _auto_radius(pts)
+            radius = _auto_radius(pts) if args.ball_radius == 0 else args.ball_radius
             for ring in ball_pivot_perimeter(pts, radius):
                 closed = np.vstack([ring, ring[0]])   # close the polygon
                 ax.plot(closed[:, 0], closed[:, 1],
@@ -382,8 +380,8 @@ def main():
     ]
     if args.min_ticks_lived:
         title_parts.append(f"min_lived={args.min_ticks_lived} ticks")
-    if args.perimeter:
-        r_label = f"{args.ball_radius:.1f}" if args.ball_radius else "auto"
+    if args.ball_radius is not None:
+        r_label = "auto" if args.ball_radius == 0 else f"{args.ball_radius:.1f}"
         title_parts.append(f"ball-radius={r_label}")
     ax.set_title("Species map — " + "  |  ".join(title_parts), fontsize=10)
 
