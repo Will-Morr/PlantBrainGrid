@@ -16,15 +16,23 @@ Usage:
     python tools/plot_species_map.py logs/ --eps 150
     python tools/plot_species_map.py logs/ --min-ticks-lived 100 --output species.png
     python tools/plot_species_map.py logs/ --eps 80 --min-samples 3 --point-size 12
+    python tools/plot_species_map.py logs/ --perimeter
+    python tools/plot_species_map.py logs/ --perimeter --ball-radius 20
 
 --eps is the maximum number of bytes two genomes may differ and still be
 considered the same species.  Tune it relative to genome length (1024 bytes):
   tight clusters   →  small eps  (e.g. 50–100)
   loose / species  →  large eps  (e.g. 200–400)
 
+--ball-radius controls the perimeter (2D ball pivot / alpha shape).  The ball
+is a circle rolled over the Delaunay triangulation of each cluster's plant
+positions; boundary edges are those shared by only one triangle whose
+circumradius ≤ ball-radius.  Larger radius = looser / convex-hull-like
+boundary; smaller radius = tighter, can split into multiple rings.
+Defaults to 3× the average nearest-neighbour distance within each cluster.
+
 Requirements:
-    pip install pyarrow numpy matplotlib scikit-learn
-    pip install scipy    # optional — faster distance computation
+    pip install pyarrow numpy matplotlib scikit-learn scipy
 """
 
 import argparse
@@ -121,6 +129,105 @@ def load_lifetimes(log_dir: str) -> tuple[dict[int, int], int]:
 
 
 # ---------------------------------------------------------------------------
+# 2D Ball Pivot / Alpha Shape perimeter
+# ---------------------------------------------------------------------------
+
+def _circumradius(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray) -> float:
+    """Circumradius of a triangle given three 2-D points."""
+    a = np.linalg.norm(p1 - p0)
+    b = np.linalg.norm(p2 - p1)
+    c = np.linalg.norm(p0 - p2)
+    # |cross product| = 2 * area
+    area2 = abs((p1[0] - p0[0]) * (p2[1] - p0[1])
+                - (p2[0] - p0[0]) * (p1[1] - p0[1]))
+    return (a * b * c) / area2 if area2 > 1e-12 else np.inf
+
+
+def _auto_radius(points: np.ndarray) -> float:
+    """3× average nearest-neighbour distance — a sensible default ball radius."""
+    from scipy.spatial import cKDTree
+    dists, _ = cKDTree(points).query(points, k=2)   # k=2: self + nearest
+    return float(dists[:, 1].mean()) * 3.0
+
+
+def ball_pivot_perimeter(points: np.ndarray, radius: float) -> list[np.ndarray]:
+    """Return boundary polygon(s) of a point cloud using a 2-D ball pivot.
+
+    Rolls a circle of *radius* over the Delaunay triangulation of *points*.
+    Edges that belong to exactly one triangle whose circumradius ≤ radius are
+    boundary edges (the alpha-shape criterion).  Those edges are then stitched
+    into closed rings and returned as a list of (M, 2) vertex arrays.
+
+    points : (N, 2) float array
+    radius : ball radius in the same units as points
+    """
+    from collections import defaultdict
+    from scipy.spatial import Delaunay
+
+    if len(points) < 3:
+        return []
+
+    try:
+        tri = Delaunay(points)
+    except Exception:
+        return []
+
+    # Count how many alpha-valid triangles each edge belongs to.
+    # Edges with count == 1 are on the boundary.
+    edge_count: dict[tuple[int, int], int] = defaultdict(int)
+    for s in tri.simplices:
+        i, j, k = int(s[0]), int(s[1]), int(s[2])
+        if _circumradius(points[i], points[j], points[k]) <= radius:
+            for a, b in ((i, j), (j, k), (i, k)):
+                edge_count[(min(a, b), max(a, b))] += 1
+
+    boundary = [(a, b) for (a, b), cnt in edge_count.items() if cnt == 1]
+    if not boundary:
+        return []
+
+    # Build adjacency list for boundary vertices.
+    adj: dict[int, list[int]] = defaultdict(list)
+    for a, b in boundary:
+        adj[a].append(b)
+        adj[b].append(a)
+
+    # Trace closed rings using edge-based visited tracking.
+    visited_edges: set[tuple[int, int]] = set()
+    rings: list[np.ndarray] = []
+
+    for start_a, start_b in boundary:
+        edge = (min(start_a, start_b), max(start_a, start_b))
+        if edge in visited_edges:
+            continue
+
+        visited_edges.add(edge)
+        ring = [start_a, start_b]
+        prev, cur = start_a, start_b
+
+        while True:
+            # Prefer unvisited neighbours; stop when we close the loop.
+            moved = False
+            for nxt in adj[cur]:
+                if nxt == prev:
+                    continue
+                e = (min(cur, nxt), max(cur, nxt))
+                if e not in visited_edges:
+                    visited_edges.add(e)
+                    prev, cur = cur, nxt
+                    ring.append(cur)
+                    moved = True
+                    break
+
+            if not moved or cur == ring[0]:
+                break
+
+        if len(ring) >= 3:
+            rings.append(points[np.array(ring)])
+
+    return rings
+
+
+# ---------------------------------------------------------------------------
 # Colour palette — 40 visually distinct colours, cycling for large K
 # ---------------------------------------------------------------------------
 
@@ -153,6 +260,10 @@ def main():
                         help="Subsample randomly if more plants than this")
     parser.add_argument("--no-noise", action="store_true",
                         help="Hide unclustered noise points (DBSCAN label -1)")
+    parser.add_argument("--perimeter", action="store_true",
+                        help="Draw a 2-D ball-pivot boundary around each cluster")
+    parser.add_argument("--ball-radius", type=float, default=None,
+                        help="Ball radius for perimeter (default: auto per cluster)")
     parser.add_argument("--point-size", type=float, default=8.0,
                         help="Marker area in points²")
     parser.add_argument("--output", default=None,
@@ -242,12 +353,22 @@ def main():
                    s=args.point_size * 0.6, linewidths=0.5,
                    alpha=0.5, zorder=1, label=f"unclustered  (n={n_noise})")
 
-    # One scatter call per cluster
+    # One scatter call per cluster, with optional ball-pivot perimeter
     for cid in range(n_clusters):
         m = labels == cid
-        ax.scatter(xs[m], ys[m], color=palette[cid], marker="o",
+        color = palette[cid]
+        ax.scatter(xs[m], ys[m], color=color, marker="o",
                    s=args.point_size, linewidths=0, alpha=0.85,
                    zorder=2, label=f"cluster {cid}  (n={m.sum()})")
+
+        if args.perimeter and m.sum() >= 3:
+            pts = np.column_stack([xs[m], ys[m]])
+            radius = args.ball_radius if args.ball_radius is not None \
+                     else _auto_radius(pts)
+            for ring in ball_pivot_perimeter(pts, radius):
+                closed = np.vstack([ring, ring[0]])   # close the polygon
+                ax.plot(closed[:, 0], closed[:, 1],
+                        color=color, linewidth=1.5, alpha=0.75, zorder=3)
 
     ax.set_xlabel("World X", fontsize=11)
     ax.set_ylabel("World Y", fontsize=11)
@@ -261,6 +382,9 @@ def main():
     ]
     if args.min_ticks_lived:
         title_parts.append(f"min_lived={args.min_ticks_lived} ticks")
+    if args.perimeter:
+        r_label = f"{args.ball_radius:.1f}" if args.ball_radius else "auto"
+        title_parts.append(f"ball-radius={r_label}")
     ax.set_title("Species map — " + "  |  ".join(title_parts), fontsize=10)
 
     # Legend: collapse to ncols if many clusters
