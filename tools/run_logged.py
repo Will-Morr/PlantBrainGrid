@@ -219,9 +219,10 @@ def main():
         description="Run N ticks and log brain/reproduction data to Parquet",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--ticks",      type=int, required=True,  help="Ticks to simulate")
-    parser.add_argument("--width",      type=int, default=256,    help="World width")
-    parser.add_argument("--height",     type=int, default=256,    help="World height")
+    parser.add_argument("ticks",      type=int,  help="Ticks to simulate")
+    parser.add_argument("init_path",  type=str,   help="Path to initial sim state")
+    parser.add_argument("--width",      type=int, default=128,    help="World width")
+    parser.add_argument("--height",     type=int, default=128,    help="World height")
     parser.add_argument("--seed",       type=int, default=42,     help="RNG seed")
     parser.add_argument("--genome",     type=str, default=None,
                         help="Path to .bin genome (default: random genomes)")
@@ -242,6 +243,9 @@ def main():
     # ── Build simulation ────────────────────────────────────────────────────
     rng = pyrandom.Random(args.seed)
     sim = pbg.Simulation(args.width, args.height, args.seed)
+
+    if args.init_path is not None:
+        sim.load_state(args.init_path)
 
     genome_template: list | None = None
     if args.genome:
