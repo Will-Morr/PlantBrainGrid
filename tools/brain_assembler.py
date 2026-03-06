@@ -51,18 +51,26 @@ Assembly format:
     SENSE_AGE [dest]
 
     ; Plant actions
-    PLACE_CELL type, dx, dy    ; type=SmallLeaf|BigLeaf|Root|Xylem|FireproofXylem|Thorn|FireStarter
+    PLACE_CELL type, dx, dy    ; type=SmallLeaf|BigLeaf|FiberRoot|TapRoot|Anther|Bark|Thorn|FireStarter
     ROTATE_CELL dx, dy, rotation    ; NOP (orientation removed; args consumed for compatibility)
     TOGGLE_CELL dx, dy, ON|OFF|1|0
     REMOVE_CELL dx, dy
 
-    ; Reproduction
-    START_MATE_SEARCH max_dist
-    ADD_MATE_WEIGHT criterion, weight    ; criterion=Size|Age|Energy|Water|Nutrients|Distance|Similarity|Difference
-    FINISH_MATE_SELECT
+    ; Reproduction — each MATE_BY_* opcode adds one criterion
+    MATE_BY_SIZE        max_dist, magnitude
+    MATE_BY_AGE         max_dist, magnitude
+    MATE_BY_ENERGY      max_dist, magnitude
+    MATE_BY_WATER       max_dist, magnitude
+    MATE_BY_NUTRIENTS   max_dist, magnitude
+    MATE_BY_DISTANCE    max_dist, magnitude   ; prefer closer mates
+    MATE_BY_SIMILARITY  max_dist, magnitude   ; prefer genetically similar
+    MATE_BY_DIFFERENCE  max_dist, magnitude   ; prefer genetically different
+    MATE_BY_CELL_COUNT  max_dist, cell_type, target_count, magnitude
+                                              ; prefer mates with target_count cells of cell_type
     LAUNCH_SEED recomb, energy, water, nutrients, power, dx, dy, placement
                                          ; recomb=MotherOnly|FatherOnly|Mother75|Father75|HalfHalf|RandomMix|Alternating
                                          ; placement=exact|random
+                                         ; if no mate found and no anther plants exist, reproduces asexually
 
     ; Macros
     .define NAME value               ; Define a named constant
@@ -73,8 +81,7 @@ Assembly format:
 
 import argparse
 import sys
-import re
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple
 
 NUM_OPCODES = 0xA0
 BRAIN_SIZE = 1024
@@ -121,21 +128,22 @@ OPCODES = {
     "ROTATE_CELL": (0x61, "rel8 rel8 rel8"),
     "TOGGLE_CELL": (0x62, "rel8 rel8 bool"),
     "REMOVE_CELL": (0x63, "rel8 rel8"),
-    "START_MATE_SEARCH": (0x80, "imm8"),
-    "ADD_MATE_WEIGHT": (0x81, "criterion imm8"),
-    "FINISH_MATE_SELECT": (0x82, 0),
-    "LAUNCH_SEED": (0x83, "recomb imm8 imm8 imm8 imm8 rel8 rel8 placement"),
+    "MATE_BY_SIZE":       (0x80, "imm8 imm8"),
+    "MATE_BY_AGE":        (0x81, "imm8 imm8"),
+    "MATE_BY_ENERGY":     (0x82, "imm8 imm8"),
+    "MATE_BY_WATER":      (0x83, "imm8 imm8"),
+    "MATE_BY_NUTRIENTS":  (0x84, "imm8 imm8"),
+    "MATE_BY_DISTANCE":   (0x85, "imm8 imm8"),
+    "MATE_BY_SIMILARITY": (0x86, "imm8 imm8"),
+    "MATE_BY_DIFFERENCE": (0x87, "imm8 imm8"),
+    "MATE_BY_CELL_COUNT": (0x88, "imm8 ctype imm8 imm8"),
+    "LAUNCH_SEED":        (0x89, "recomb imm8 imm8 imm8 imm8 rel8 rel8 placement"),
 }
 
 CELL_TYPES = {
     "Empty": 0, "Primary": 1, "SmallLeaf": 2, "BigLeaf": 3,
     "FiberRoot": 4, "Anther": 5, "Bark": 6, "Thorn": 7, "FireStarter": 8,
     "TapRoot": 9,
-}
-
-MATE_CRITERIA = {
-    "Size": 0, "Age": 1, "Energy": 2, "Water": 3,
-    "Nutrients": 4, "Distance": 5, "Similarity": 6, "Difference": 7
 }
 
 RECOMB_METHODS = {
@@ -364,7 +372,7 @@ class BrainAssembler:
                 if ct in CELL_TYPES:
                     self._emit(CELL_TYPES[ct])
                 else:
-                    self._emit(self._parse_int(arg, "cell type") % 9)
+                    self._emit(self._parse_int(arg, "cell type") % 10)
 
             elif fmt_type == "bool":
                 larg = arg.strip().lower()
@@ -374,13 +382,6 @@ class BrainAssembler:
                     self._emit(0)
                 else:
                     self._emit(self._parse_int(arg, "bool") & 1)
-
-            elif fmt_type == "criterion":
-                c = arg.strip()
-                if c in MATE_CRITERIA:
-                    self._emit(MATE_CRITERIA[c])
-                else:
-                    self._emit(self._parse_int(arg, "mate criterion") & 0xFF)
 
             elif fmt_type == "recomb":
                 r = arg.strip()

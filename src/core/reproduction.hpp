@@ -40,7 +40,8 @@ public:
     static uint64_t select_mate(
         const Plant& mother,
         const std::vector<Plant>& all_plants,
-        const MateSearchState& search_state);
+        const MateSearchState& search_state,
+        std::mt19937_64& rng);
 
     // Create offspring genome using recombination
     static std::vector<uint8_t> recombine_genomes(
@@ -83,12 +84,13 @@ private:
     static float calculate_mate_score(
         const Plant& mother,
         const Plant& candidate,
-        const MateSearchState& search_state);
+        const MateSearchState& search_state,
+        std::mt19937_64& rng);
 
     // Get criterion value from a plant
     static float get_criterion_value(
         const Plant& plant,
-        uint8_t criterion);
+        const MateCriterion& criterion);
 };
 
 }  // namespace pbg

@@ -159,6 +159,19 @@ Simulation::collect_all_actions() {
     }
     for (auto& t : threads) t.join();
 
+    // Phase 1.5 (sequential): run mate selection for every alive plant.
+    // Distance bias (cfg.mate_distance_bias) is always applied, so even plants
+    // that never called MATE_BY_* automatically prefer the nearest Anther-bearing
+    // neighbour.  This must happen after all brains have executed (criteria are
+    // populated) and before action processing (selected_mate_id must be set).
+    for (size_t i = 0; i < n; ++i) {
+        auto& plant = plants_[i];
+        if (!plant.is_alive()) continue;
+        uint64_t mate_id = ReproductionSystem::select_mate(
+            plant, plants_, plant.brain().mate_search(), world_.rng());
+        plant.brain().mate_search().selected_mate_id = mate_id;
+    }
+
     // Phase 2 (sequential): process collected actions.
     std::unordered_map<GridCoord, std::vector<std::pair<uint64_t, QueuedAction>>> all_actions;
 
@@ -175,12 +188,21 @@ Simulation::collect_all_actions() {
                     uint64_t mate_id = plant.brain().mate_search().selected_mate_id;
                     const Plant* father = (mate_id != 0) ? find_plant(mate_id) : nullptr;
                     if (father) {
+                        // Sexual reproduction with selected mate
                         auto seed = ReproductionSystem::create_seed(
                             plant, *father, *action.seed_params, world_.rng());
                         if (seed) {
                             add_seed(std::move(*seed));
                         }
+                    } else if (!any_plant_has_anther(plant.id())) {
+                        // Asexual fallback: no other anther-bearing plants exist
+                        auto seed = ReproductionSystem::create_seed(
+                            plant, plant, *action.seed_params, world_.rng());
+                        if (seed) {
+                            add_seed(std::move(*seed));
+                        }
                     }
+                    // else: anther plants exist but none selected → no seed produced
                 }
             } else {
                 if (action.type == ActionType::ToggleCell) {
@@ -495,6 +517,16 @@ Plant* Simulation::spawn_random_plant() {
         }
     }
     return nullptr;
+}
+
+bool Simulation::any_plant_has_anther(uint64_t exclude_id) const {
+    for (const auto& plant : plants_) {
+        if (plant.id() == exclude_id || !plant.is_alive()) continue;
+        for (const auto& cell : plant.cells()) {
+            if (cell.type == CellType::Anther && cell.enabled) return true;
+        }
+    }
+    return false;
 }
 
 void Simulation::check_auto_spawn() {

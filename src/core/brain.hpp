@@ -54,11 +54,18 @@ struct ExecutionTrace {
     uint32_t oob_count = 0;
 };
 
-// Mate selection state
+// A single weighted criterion for mate selection
+struct MateCriterion {
+    uint8_t type;           // MATE_CRIT_* constant
+    uint8_t magnitude;      // importance weight (0-255)
+    uint8_t param1 = 0;     // CELL_COUNT: cell type index
+    uint8_t param2 = 0;     // CELL_COUNT: target count
+};
+
+// Mate selection state — cleared at the start of each brain tick
 struct MateSearchState {
-    bool active = false;
     float max_distance = 0.0f;
-    std::vector<std::pair<uint8_t, uint8_t>> weights;  // (criterion, weight)
+    std::vector<MateCriterion> criteria;
     uint64_t selected_mate_id = 0;
 };
 

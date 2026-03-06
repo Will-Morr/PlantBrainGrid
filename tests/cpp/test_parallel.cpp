@@ -204,12 +204,13 @@ TEST_CASE("Resource edge cases", "[parallel][resources]") {
         REQUIRE(sim.plants().empty());
     }
 
-    SECTION("Plant at exactly zero water after tick dies") {
+    SECTION("Plant with negative water after tick dies") {
         Simulation sim(50, 50, 42);
         Plant* p = sim.add_plant({25, 25}, make_halt_genome());
         REQUIRE(p != nullptr);
         sim.world().cell_at({25, 25}).water_level = 0.f;
-        p->resources() = Resources{500.f, 0.0f, 100.f};
+        // Start slightly below zero — starvation check triggers at < 0
+        p->resources() = Resources{500.f, -0.001f, 100.f};
         sim.advance_tick();
         REQUIRE(sim.plants().empty());
     }

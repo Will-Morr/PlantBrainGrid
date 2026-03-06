@@ -50,29 +50,29 @@ OPCODES: Dict[int, Tuple[str, int]] = {
     0x49: ("SENSE_CELL_COUNT", 2),
     0x4A: ("SENSE_AGE", 2),
     # Plant Actions
-    0x60: ("PLACE_CELL", 4),     # type, dx, dy, dir
-    0x61: ("ROTATE_CELL", 3),    # dx, dy, rotation
+    0x60: ("PLACE_CELL", 3),     # type, dx, dy
+    0x61: ("ROTATE_CELL", 3),    # dx, dy, rotation (NOP)
     0x62: ("TOGGLE_CELL", 3),    # dx, dy, enabled
     0x63: ("REMOVE_CELL", 2),    # dx, dy
-    # Reproduction
-    0x80: ("START_MATE_SEARCH", 1),   # max_dist
-    0x81: ("ADD_MATE_WEIGHT", 2),     # criterion, weight
-    0x82: ("FINISH_MATE_SELECT", 0),
-    0x83: ("LAUNCH_SEED", 8),         # recomb, energy, water, nutrients, power, dx, dy, placement
+    # Reproduction — each MATE_BY_* adds one criterion; cleared each brain tick
+    0x80: ("MATE_BY_SIZE", 2),        # max_dist, magnitude
+    0x81: ("MATE_BY_AGE", 2),
+    0x82: ("MATE_BY_ENERGY", 2),
+    0x83: ("MATE_BY_WATER", 2),
+    0x84: ("MATE_BY_NUTRIENTS", 2),
+    0x85: ("MATE_BY_DISTANCE", 2),
+    0x86: ("MATE_BY_SIMILARITY", 2),
+    0x87: ("MATE_BY_DIFFERENCE", 2),
+    0x88: ("MATE_BY_CELL_COUNT", 4),  # max_dist, cell_type, target_count, magnitude
+    0x89: ("LAUNCH_SEED", 8),         # recomb, energy, water, nutrients, power, dx, dy, placement
 }
 
 NUM_OPCODES = 0xA0
 
 CELL_TYPE_NAMES = {
     0: "Empty", 1: "Primary", 2: "SmallLeaf", 3: "BigLeaf",
-    4: "Root", 5: "Anther", 6: "Bark", 7: "Thorn", 8: "FireStarter"
-}
-
-DIRECTION_NAMES = {0: "North", 1: "East", 2: "South", 3: "West"}
-
-MATE_CRITERION_NAMES = {
-    0: "Size", 1: "Age", 2: "Energy", 3: "Water",
-    4: "Nutrients", 5: "Distance", 6: "Similarity", 7: "Difference"
+    4: "FiberRoot", 5: "Anther", 6: "Bark", 7: "Thorn",
+    8: "FireStarter", 9: "TapRoot",
 }
 
 RECOMB_NAMES = {
@@ -112,14 +112,8 @@ def decode_instruction(mem: bytes, ip: int) -> Optional[Tuple[str, List[int], in
 
 def format_instruction(name: str, args: List[int]) -> str:
     """Format an instruction into a human-readable string."""
-    if name == "NOP":
-        return "NOP"
-    if name == "HALT":
-        return "HALT"
-    if name == "RET":
-        return "RET"
-    if name == "FINISH_MATE_SELECT":
-        return "FINISH_MATE_SELECT"
+    if name in ("NOP", "HALT", "RET"):
+        return name
 
     if name == "JUMP":
         addr = args[0] | (args[1] << 8)
@@ -169,11 +163,10 @@ def format_instruction(name: str, args: List[int]) -> str:
         dest = args[0] | (args[1] << 8)
         return f"{name} [0x{dest:04X}]"
     if name == "PLACE_CELL":
-        ctype = CELL_TYPE_NAMES.get(args[0] % 9, f"Type{args[0]}")
+        ctype = CELL_TYPE_NAMES.get(args[0] % 10, f"Type{args[0]}")
         dx = args[1] if args[1] < 128 else args[1] - 256
         dy = args[2] if args[2] < 128 else args[2] - 256
-        direction = DIRECTION_NAMES.get(args[3] % 4, f"Dir{args[3]}")
-        return f"PLACE_CELL {ctype}, ({dx:+d},{dy:+d}), {direction}"
+        return f"PLACE_CELL {ctype}, ({dx:+d},{dy:+d})"
     if name == "ROTATE_CELL":
         dx = args[0] if args[0] < 128 else args[0] - 256
         dy = args[1] if args[1] < 128 else args[1] - 256
@@ -187,18 +180,20 @@ def format_instruction(name: str, args: List[int]) -> str:
         dx = args[0] if args[0] < 128 else args[0] - 256
         dy = args[1] if args[1] < 128 else args[1] - 256
         return f"REMOVE_CELL ({dx:+d},{dy:+d})"
-    if name == "START_MATE_SEARCH":
-        return f"START_MATE_SEARCH {args[0]}"
-    if name == "ADD_MATE_WEIGHT":
-        criterion = MATE_CRITERION_NAMES.get(args[0], f"Crit{args[0]}")
-        return f"ADD_MATE_WEIGHT {criterion}, {args[1]}"
+    if name in ("MATE_BY_SIZE", "MATE_BY_AGE", "MATE_BY_ENERGY", "MATE_BY_WATER",
+                "MATE_BY_NUTRIENTS", "MATE_BY_DISTANCE", "MATE_BY_SIMILARITY",
+                "MATE_BY_DIFFERENCE"):
+        return f"{name} max_dist={args[0]}, magnitude={args[1]}"
+    if name == "MATE_BY_CELL_COUNT":
+        ctype = CELL_TYPE_NAMES.get(args[1] % 10, f"Type{args[1]}")
+        return f"MATE_BY_CELL_COUNT max_dist={args[0]}, type={ctype}, target={args[2]}, magnitude={args[3]}"
     if name == "LAUNCH_SEED":
         recomb = RECOMB_NAMES.get(args[0] % 7, f"Recomb{args[0]}")
         dx = args[5] if args[5] < 128 else args[5] - 256
         dy = args[6] if args[6] < 128 else args[6] - 256
         return (f"LAUNCH_SEED {recomb}, energy={args[1]}, water={args[2]}, "
                 f"nutrients={args[3]}, power={args[4]}, ({dx:+d},{dy:+d}), "
-                f"placement={'exact' if args[7] & 1 else 'random'}")
+                f"placement={'random' if args[7] & 1 else 'exact'}")
 
     return f"{name} {' '.join(str(a) for a in args)}"
 

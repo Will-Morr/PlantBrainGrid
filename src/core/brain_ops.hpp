@@ -58,19 +58,28 @@ constexpr uint8_t OP_TOGGLE_CELL = 0x62;
 constexpr uint8_t OP_REMOVE_CELL = 0x63;
 
 // Reproduction (0x80-0x9F)
-constexpr uint8_t OP_START_MATE_SEARCH = 0x80;
-constexpr uint8_t OP_ADD_MATE_WEIGHT = 0x81;
-constexpr uint8_t OP_FINISH_MATE_SELECT = 0x82;
-constexpr uint8_t OP_LAUNCH_SEED = 0x83;
+// Each MATE_BY_* opcode: args: max_dist (1 byte), magnitude (1 byte)
+// MATE_BY_CELL_COUNT: args: max_dist, cell_type, target_count, magnitude
+constexpr uint8_t OP_MATE_BY_SIZE       = 0x80;
+constexpr uint8_t OP_MATE_BY_AGE        = 0x81;
+constexpr uint8_t OP_MATE_BY_ENERGY     = 0x82;
+constexpr uint8_t OP_MATE_BY_WATER      = 0x83;
+constexpr uint8_t OP_MATE_BY_NUTRIENTS  = 0x84;
+constexpr uint8_t OP_MATE_BY_DISTANCE   = 0x85;
+constexpr uint8_t OP_MATE_BY_SIMILARITY = 0x86;
+constexpr uint8_t OP_MATE_BY_DIFFERENCE = 0x87;
+constexpr uint8_t OP_MATE_BY_CELL_COUNT = 0x88;
+constexpr uint8_t OP_LAUNCH_SEED        = 0x89;
 
-// Mate selection criteria codes
-constexpr uint8_t MATE_CRITERION_SIZE = 0x00;
-constexpr uint8_t MATE_CRITERION_AGE = 0x01;
-constexpr uint8_t MATE_CRITERION_ENERGY = 0x02;
-constexpr uint8_t MATE_CRITERION_WATER = 0x03;
-constexpr uint8_t MATE_CRITERION_NUTRIENTS = 0x04;
-constexpr uint8_t MATE_CRITERION_DISTANCE = 0x05;
-constexpr uint8_t MATE_CRITERION_SIMILARITY = 0x06;
-constexpr uint8_t MATE_CRITERION_DIFFERENCE = 0x07;
+// Internal mate criterion type codes (stored in MateCriterion::type)
+constexpr uint8_t MATE_CRIT_SIZE       = 0;
+constexpr uint8_t MATE_CRIT_AGE        = 1;
+constexpr uint8_t MATE_CRIT_ENERGY     = 2;
+constexpr uint8_t MATE_CRIT_WATER      = 3;
+constexpr uint8_t MATE_CRIT_NUTRIENTS  = 4;
+constexpr uint8_t MATE_CRIT_DISTANCE   = 5;
+constexpr uint8_t MATE_CRIT_SIMILARITY = 6;
+constexpr uint8_t MATE_CRIT_DIFFERENCE = 7;
+constexpr uint8_t MATE_CRIT_CELL_COUNT = 8;
 
 }  // namespace pbg

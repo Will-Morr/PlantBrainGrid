@@ -124,6 +124,9 @@ private:
 
     // Check if auto-spawn should fire and do so
     void check_auto_spawn();
+
+    // Returns true if any living plant (other than the given one) has an enabled Anther cell
+    bool any_plant_has_anther(uint64_t exclude_id = 0) const;
 };
 
 }  // namespace pbg

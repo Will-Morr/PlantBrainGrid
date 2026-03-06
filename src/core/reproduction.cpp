@@ -11,10 +11,19 @@ namespace pbg {
 uint64_t ReproductionSystem::select_mate(
     const Plant& mother,
     const std::vector<Plant>& all_plants,
-    const MateSearchState& search_state)
+    const MateSearchState& search_state,
+    std::mt19937_64& rng)
 {
-    if (search_state.weights.empty()) {
-        return 0;  // No criteria specified
+    const auto& cfg = get_config();
+
+    // Use the larger of the brain-specified search radius and the config default.
+    // This lets the distance-bias criterion always find nearby mates even when no
+    // MATE_BY_* opcodes were executed.
+    float effective_max_dist = std::max(search_state.max_distance, cfg.max_mate_distance);
+
+    // If there is nothing to rank candidates by, skip mate selection entirely.
+    if (search_state.criteria.empty() && cfg.mate_distance_bias <= 0.0f) {
+        return 0;
     }
 
     float best_score = -std::numeric_limits<float>::infinity();
@@ -43,11 +52,11 @@ uint64_t ReproductionSystem::select_mate(
         float dy = static_cast<float>(candidate.primary_position().y - mother.primary_position().y);
         float distance = std::sqrt(dx * dx + dy * dy);
 
-        if (distance > search_state.max_distance) {
+        if (distance > effective_max_dist) {
             continue;
         }
 
-        float score = calculate_mate_score(mother, candidate, search_state);
+        float score = calculate_mate_score(mother, candidate, search_state, rng);
 
         if (score > best_score) {
             best_score = score;
@@ -61,24 +70,22 @@ uint64_t ReproductionSystem::select_mate(
 float ReproductionSystem::calculate_mate_score(
     const Plant& mother,
     const Plant& candidate,
-    const MateSearchState& search_state)
+    const MateSearchState& search_state,
+    std::mt19937_64& rng)
 {
+    const auto& cfg = get_config();
     float score = 0.0f;
 
     float dx = static_cast<float>(candidate.primary_position().x - mother.primary_position().x);
     float dy = static_cast<float>(candidate.primary_position().y - mother.primary_position().y);
     float distance = std::sqrt(dx * dx + dy * dy);
 
-    for (const auto& [criterion, weight] : search_state.weights) {
-        float value = get_criterion_value(candidate, criterion);
+    for (const auto& criterion : search_state.criteria) {
+        float value = 0.0f;
 
-        // For distance, invert so closer is better
-        if (criterion == MATE_CRITERION_DISTANCE) {
+        if (criterion.type == MATE_CRIT_DISTANCE) {
             value = search_state.max_distance - distance;
-        }
-
-        // For similarity/difference, compare genomes
-        if (criterion == MATE_CRITERION_SIMILARITY || criterion == MATE_CRITERION_DIFFERENCE) {
+        } else if (criterion.type == MATE_CRIT_SIMILARITY || criterion.type == MATE_CRIT_DIFFERENCE) {
             const auto& m_genome = mother.brain().memory();
             const auto& c_genome = candidate.brain().memory();
             size_t min_size = std::min(m_genome.size(), c_genome.size());
@@ -91,33 +98,53 @@ float ReproductionSystem::calculate_mate_score(
             }
 
             float similarity = static_cast<float>(matches) / static_cast<float>(min_size);
-            value = (criterion == MATE_CRITERION_SIMILARITY) ? similarity : (1.0f - similarity);
+            value = (criterion.type == MATE_CRIT_SIMILARITY) ? similarity : (1.0f - similarity);
             value *= 255.0f;  // Scale to match other criteria
+        } else {
+            value = get_criterion_value(candidate, criterion);
         }
 
-        score += value * static_cast<float>(weight);
+        score += value * static_cast<float>(criterion.magnitude);
     }
 
     // Always apply distance bias: closer candidates score higher
-    score -= distance * get_config().mate_distance_bias;
+    score -= distance * cfg.mate_distance_bias;
+
+    // Add small random noise to break ties and introduce selection stochasticity
+    if (cfg.mate_selection_noise > 0.0f) {
+        std::uniform_real_distribution<float> noise_dist(-cfg.mate_selection_noise,
+                                                          cfg.mate_selection_noise);
+        score += noise_dist(rng);
+    }
 
     return score;
 }
 
-float ReproductionSystem::get_criterion_value(const Plant& plant, uint8_t criterion) {
+float ReproductionSystem::get_criterion_value(const Plant& plant, const MateCriterion& criterion) {
     const auto& cfg = get_config();
 
-    switch (criterion) {
-        case MATE_CRITERION_SIZE:
-            return static_cast<float>(std::min(255UL, plant.cell_count()));
-        case MATE_CRITERION_AGE:
-            return static_cast<float>(std::min(255UL, plant.age() / 100));
-        case MATE_CRITERION_ENERGY:
+    switch (criterion.type) {
+        case MATE_CRIT_SIZE:
+            return static_cast<float>(std::min(size_t{255}, plant.cell_count()));
+        case MATE_CRIT_AGE:
+            return static_cast<float>(std::min(uint64_t{255}, plant.age() / 100));
+        case MATE_CRIT_ENERGY:
             return std::min(255.0f, plant.resources().energy * cfg.resource_sense_scale);
-        case MATE_CRITERION_WATER:
+        case MATE_CRIT_WATER:
             return std::min(255.0f, plant.resources().water * cfg.resource_sense_scale);
-        case MATE_CRITERION_NUTRIENTS:
+        case MATE_CRIT_NUTRIENTS:
             return std::min(255.0f, plant.resources().nutrients * cfg.resource_sense_scale);
+        case MATE_CRIT_CELL_COUNT: {
+            // Count cells of the requested type; score peaks when count == target
+            CellType target_type = static_cast<CellType>(criterion.param1 % 10);
+            size_t count = 0;
+            for (const auto& cell : plant.cells()) {
+                if (cell.type == target_type) ++count;
+            }
+            float deviation = std::abs(static_cast<float>(count)
+                                       - static_cast<float>(criterion.param2));
+            return std::max(0.0f, 255.0f - deviation);
+        }
         default:
             return 0.0f;
     }

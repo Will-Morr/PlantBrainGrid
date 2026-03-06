@@ -272,6 +272,8 @@ static Plant make_plant_with_anther(uint64_t id, const GridCoord& pos, World& wo
 }
 
 TEST_CASE("Mate selection", "[reproduction]") {
+    std::mt19937_64 rng(42);
+
     SECTION("Selects mate within distance") {
         World world(200, 200, 42);
         auto mother     = make_test_plant(1, {50, 50});
@@ -285,10 +287,10 @@ TEST_CASE("Mate selection", "[reproduction]") {
 
         MateSearchState search;
         search.max_distance = 20.0f;
-        search.weights.push_back({MATE_CRITERION_SIZE, 1});
+        search.criteria.push_back({MATE_CRIT_SIZE, 1});
 
         uint64_t selected = ReproductionSystem::select_mate(
-            all_plants[0], all_plants, search);
+            all_plants[0], all_plants, search, rng);
 
         // Should select candidate1 (within range), not candidate2 (out of range)
         REQUIRE(selected == 2);
@@ -302,10 +304,10 @@ TEST_CASE("Mate selection", "[reproduction]") {
 
         MateSearchState search;
         search.max_distance = 100.0f;
-        search.weights.push_back({MATE_CRITERION_SIZE, 1});
+        search.criteria.push_back({MATE_CRIT_SIZE, 1});
 
         uint64_t selected = ReproductionSystem::select_mate(
-            all_plants[0], all_plants, search);
+            all_plants[0], all_plants, search, rng);
 
         REQUIRE(selected == 0);
     }
@@ -323,10 +325,10 @@ TEST_CASE("Mate selection", "[reproduction]") {
 
         MateSearchState search;
         search.max_distance = 100.0f;
-        search.weights.push_back({MATE_CRITERION_DISTANCE, 10});
+        search.criteria.push_back({MATE_CRIT_DISTANCE, 10});
 
         uint64_t selected = ReproductionSystem::select_mate(
-            all_plants[0], all_plants, search);
+            all_plants[0], all_plants, search, rng);
 
         REQUIRE(selected == 2);  // Should select closer mate
     }
@@ -334,7 +336,9 @@ TEST_CASE("Mate selection", "[reproduction]") {
     SECTION("Default distance bias favors closer mates without explicit criterion") {
         auto& cfg = get_config();
         float orig_bias = cfg.mate_distance_bias;
+        float orig_noise = cfg.mate_selection_noise;
         cfg.mate_distance_bias = 1.0f;
+        cfg.mate_selection_noise = 0.0f;  // Disable noise for deterministic test
 
         World world(200, 200, 42);
         auto mother = make_test_plant(1, {50, 50});
@@ -348,19 +352,22 @@ TEST_CASE("Mate selection", "[reproduction]") {
 
         MateSearchState search;
         search.max_distance = 100.0f;
-        search.weights.push_back({MATE_CRITERION_SIZE, 1});
+        search.criteria.push_back({MATE_CRIT_SIZE, 1});
 
         uint64_t selected = ReproductionSystem::select_mate(
-            all_plants[0], all_plants, search);
+            all_plants[0], all_plants, search, rng);
 
         // Closer plant selected purely due to default distance bias
         REQUIRE(selected == 2);
 
         cfg.mate_distance_bias = orig_bias;
+        cfg.mate_selection_noise = orig_noise;
     }
 }
 
 TEST_CASE("Anther gate in mate selection", "[reproduction]") {
+    std::mt19937_64 rng(42);
+
     SECTION("Plant without anther cannot be selected as mate") {
         auto mother = make_test_plant(1, {50, 50});
         auto no_anther = make_test_plant(2, {55, 50});   // no anther cell
@@ -371,10 +378,10 @@ TEST_CASE("Anther gate in mate selection", "[reproduction]") {
 
         MateSearchState search;
         search.max_distance = 100.0f;
-        search.weights.push_back({MATE_CRITERION_SIZE, 1});
+        search.criteria.push_back({MATE_CRIT_SIZE, 1});
 
         uint64_t selected = ReproductionSystem::select_mate(
-            all_plants[0], all_plants, search);
+            all_plants[0], all_plants, search, rng);
 
         REQUIRE(selected == 0);  // No eligible mate
     }
@@ -395,10 +402,10 @@ TEST_CASE("Anther gate in mate selection", "[reproduction]") {
 
         MateSearchState search;
         search.max_distance = 100.0f;
-        search.weights.push_back({MATE_CRITERION_SIZE, 1});
+        search.criteria.push_back({MATE_CRIT_SIZE, 1});
 
         uint64_t selected = ReproductionSystem::select_mate(
-            all_plants[0], all_plants, search);
+            all_plants[0], all_plants, search, rng);
 
         REQUIRE(selected == 2);  // Selects the plant with anther
     }
@@ -419,10 +426,10 @@ TEST_CASE("Anther gate in mate selection", "[reproduction]") {
 
         MateSearchState search;
         search.max_distance = 100.0f;
-        search.weights.push_back({MATE_CRITERION_SIZE, 1});
+        search.criteria.push_back({MATE_CRIT_SIZE, 1});
 
         uint64_t selected = ReproductionSystem::select_mate(
-            all_plants[0], all_plants, search);
+            all_plants[0], all_plants, search, rng);
 
         REQUIRE(selected == 0);  // Disabled anther doesn't count
     }

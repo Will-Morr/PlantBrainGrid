@@ -79,6 +79,11 @@ std::vector<QueuedAction> Brain::execute_tick(Plant& plant, const World& world, 
     const auto& cfg = get_config();
     std::vector<QueuedAction> actions;
 
+    // Clear mate search state from previous tick
+    mate_search_.criteria.clear();
+    mate_search_.max_distance = 0.0f;
+    mate_search_.selected_mate_id = 0;
+
     call_stack_.clear();
     halted_ = false;
     oob_count_ = 0;
@@ -532,29 +537,78 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
             break;
         }
 
-        // Reproduction
-        case OP_START_MATE_SEARCH: {
+        // Reproduction — each MATE_BY_* opcode adds one criterion and updates max_distance
+        case OP_MATE_BY_SIZE: {
             uint8_t max_dist = read_arg();
-            mate_search_.active = true;
-            mate_search_.max_distance = static_cast<float>(max_dist);
-            mate_search_.weights.clear();
-            mate_search_.selected_mate_id = 0;
+            uint8_t magnitude = read_arg();
+            mate_search_.max_distance = std::max(mate_search_.max_distance, static_cast<float>(max_dist));
+            mate_search_.criteria.push_back({MATE_CRIT_SIZE, magnitude});
             break;
         }
 
-        case OP_ADD_MATE_WEIGHT: {
-            uint8_t criterion = read_arg();
-            uint8_t weight = read_arg();
-            if (mate_search_.active) {
-                mate_search_.weights.emplace_back(criterion, weight);
-            }
+        case OP_MATE_BY_AGE: {
+            uint8_t max_dist = read_arg();
+            uint8_t magnitude = read_arg();
+            mate_search_.max_distance = std::max(mate_search_.max_distance, static_cast<float>(max_dist));
+            mate_search_.criteria.push_back({MATE_CRIT_AGE, magnitude});
             break;
         }
 
-        case OP_FINISH_MATE_SELECT: {
-            // Mate selection will be handled by simulation loop
-            // which has access to all plants
-            mate_search_.active = false;
+        case OP_MATE_BY_ENERGY: {
+            uint8_t max_dist = read_arg();
+            uint8_t magnitude = read_arg();
+            mate_search_.max_distance = std::max(mate_search_.max_distance, static_cast<float>(max_dist));
+            mate_search_.criteria.push_back({MATE_CRIT_ENERGY, magnitude});
+            break;
+        }
+
+        case OP_MATE_BY_WATER: {
+            uint8_t max_dist = read_arg();
+            uint8_t magnitude = read_arg();
+            mate_search_.max_distance = std::max(mate_search_.max_distance, static_cast<float>(max_dist));
+            mate_search_.criteria.push_back({MATE_CRIT_WATER, magnitude});
+            break;
+        }
+
+        case OP_MATE_BY_NUTRIENTS: {
+            uint8_t max_dist = read_arg();
+            uint8_t magnitude = read_arg();
+            mate_search_.max_distance = std::max(mate_search_.max_distance, static_cast<float>(max_dist));
+            mate_search_.criteria.push_back({MATE_CRIT_NUTRIENTS, magnitude});
+            break;
+        }
+
+        case OP_MATE_BY_DISTANCE: {
+            uint8_t max_dist = read_arg();
+            uint8_t magnitude = read_arg();
+            mate_search_.max_distance = std::max(mate_search_.max_distance, static_cast<float>(max_dist));
+            mate_search_.criteria.push_back({MATE_CRIT_DISTANCE, magnitude});
+            break;
+        }
+
+        case OP_MATE_BY_SIMILARITY: {
+            uint8_t max_dist = read_arg();
+            uint8_t magnitude = read_arg();
+            mate_search_.max_distance = std::max(mate_search_.max_distance, static_cast<float>(max_dist));
+            mate_search_.criteria.push_back({MATE_CRIT_SIMILARITY, magnitude});
+            break;
+        }
+
+        case OP_MATE_BY_DIFFERENCE: {
+            uint8_t max_dist = read_arg();
+            uint8_t magnitude = read_arg();
+            mate_search_.max_distance = std::max(mate_search_.max_distance, static_cast<float>(max_dist));
+            mate_search_.criteria.push_back({MATE_CRIT_DIFFERENCE, magnitude});
+            break;
+        }
+
+        case OP_MATE_BY_CELL_COUNT: {
+            uint8_t max_dist  = read_arg();
+            uint8_t cell_type = read_arg();
+            uint8_t target    = read_arg();
+            uint8_t magnitude = read_arg();
+            mate_search_.max_distance = std::max(mate_search_.max_distance, static_cast<float>(max_dist));
+            mate_search_.criteria.push_back({MATE_CRIT_CELL_COUNT, magnitude, cell_type, target});
             break;
         }
 

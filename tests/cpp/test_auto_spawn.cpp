@@ -13,7 +13,7 @@ TEST_CASE("Mutation full randomization", "[reproduction]") {
         std::vector<uint8_t> genome(1000, 42);
 
         // Apply 100% mutation rate
-        ReproductionSystem::apply_mutations(genome, 1.0f, 16, rng);
+        ReproductionSystem::apply_mutations(genome, 1.0f, rng);
 
         // With full randomization, values should spread across the full [0,255] range
         uint8_t min_val = 255, max_val = 0;
