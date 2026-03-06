@@ -151,6 +151,62 @@ def _auto_radius(points: np.ndarray) -> float:
     return float(dists[:, 1].mean()) * 3.0
 
 
+def _offset_ring(ring: np.ndarray, distance: float) -> list[np.ndarray]:
+    """Offset a closed polygon ring outward by *distance* world units.
+
+    Tries shapely first (handles concavities and self-intersections cleanly),
+    then falls back to a per-vertex miter-bisector approach.
+    Returns a list of rings because offsetting can split or merge polygons.
+    """
+    try:
+        from shapely.geometry import Polygon, MultiPolygon
+        buffered = Polygon(ring).buffer(distance, join_style="mitre")
+        if buffered.is_empty:
+            return []
+        polys = list(buffered.geoms) if hasattr(buffered, "geoms") else [buffered]
+        return [np.array(p.exterior.coords[:-1]) for p in polys]
+    except ImportError:
+        pass
+
+    # Fallback: miter-bisector offset.
+    N = len(ring)
+    pts = ring.astype(float)
+    xs, ys = pts[:, 0], pts[:, 1]
+    # Signed shoelace area — positive = CCW, outward normal is left of travel.
+    signed_area = 0.5 * float(
+        np.dot(xs, np.roll(ys, -1)) - np.dot(np.roll(xs, -1), ys)
+    )
+    sign = 1.0 if signed_area >= 0 else -1.0
+
+    out = np.empty_like(pts)
+    for i in range(N):
+        p0, p1, p2 = pts[(i - 1) % N], pts[i], pts[(i + 1) % N]
+        e1, e2 = p1 - p0, p2 - p1
+        l1, l2 = np.linalg.norm(e1), np.linalg.norm(e2)
+        if l1 < 1e-12 or l2 < 1e-12:
+            out[i] = p1
+            continue
+        n1 = np.array([-e1[1], e1[0]]) / l1   # left-hand unit normals
+        n2 = np.array([-e2[1], e2[0]]) / l2
+        b = n1 + n2
+        bl = np.linalg.norm(b)
+        b = b / bl if bl > 1e-12 else n1
+        dot = float(np.dot(b, n1))
+        # Miter length = distance / sin(half-angle); cap at 5× to avoid spikes.
+        miter = min(abs(distance / dot), abs(distance) * 5) if abs(dot) > 1e-6 \
+                else abs(distance) * 5
+        out[i] = p1 + b * (sign * miter)
+    return [out]
+
+
+def offset_rings(rings: list[np.ndarray], distance: float) -> list[np.ndarray]:
+    """Apply _offset_ring to every ring and flatten the results."""
+    result = []
+    for ring in rings:
+        result.extend(_offset_ring(ring, distance))
+    return result
+
+
 def ball_pivot_perimeter(points: np.ndarray, radius: float) -> list[np.ndarray]:
     """Return boundary polygon(s) of a point cloud using a 2-D ball pivot.
 
@@ -264,6 +320,9 @@ def main():
     parser.add_argument("--ball-radius", type=float, default=None,
                         help="Enable perimeter outlines; ball radius in world units "
                              "(0 = auto: 3× avg nearest-neighbour distance per cluster)")
+    parser.add_argument("--outline-offset", type=float, default=0.0,
+                        help="Expand each perimeter ring outward by this many world "
+                             "units (negative = shrink); only used with --ball-radius")
     parser.add_argument("--point-size", type=float, default=8.0,
                         help="Marker area in points²")
     parser.add_argument("--output", default=None,
@@ -364,7 +423,10 @@ def main():
         if args.ball_radius is not None and m.sum() >= 3:
             pts = np.column_stack([xs[m], ys[m]])
             radius = _auto_radius(pts) if args.ball_radius == 0 else args.ball_radius
-            for ring in ball_pivot_perimeter(pts, radius):
+            rings = ball_pivot_perimeter(pts, radius)
+            if args.outline_offset:
+                rings = offset_rings(rings, args.outline_offset)
+            for ring in rings:
                 closed = np.vstack([ring, ring[0]])   # close the polygon
                 ax.plot(closed[:, 0], closed[:, 1],
                         color=color, linewidth=1.5, alpha=0.75, zorder=3)
