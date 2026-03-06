@@ -53,7 +53,6 @@ public:
     static void apply_mutations(
         std::vector<uint8_t>& genome,
         float mutation_rate,
-        uint8_t mutation_magnitude,
         std::mt19937_64& rng);
 
     // Create a seed from reproduction parameters

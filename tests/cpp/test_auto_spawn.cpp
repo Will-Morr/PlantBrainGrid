@@ -29,7 +29,7 @@ TEST_CASE("Mutation full randomization", "[reproduction]") {
 
     SECTION("Partial mutation rate leaves some bytes unchanged") {
         std::vector<uint8_t> genome(1000, 200);
-        ReproductionSystem::apply_mutations(genome, 0.1f, 16, rng);
+        ReproductionSystem::apply_mutations(genome, 0.1f, rng);
 
         int unchanged = 0;
         for (auto b : genome) {

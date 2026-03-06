@@ -110,7 +110,7 @@ TEST_CASE("Mutation application", "[reproduction]") {
         std::vector<uint8_t> genome(100, 42);
         std::vector<uint8_t> original = genome;
 
-        ReproductionSystem::apply_mutations(genome, 0.0f, 16, rng);
+        ReproductionSystem::apply_mutations(genome, 0.0f, rng);
 
         // The block mutation must have changed at least one byte
         REQUIRE(genome != original);
@@ -126,7 +126,7 @@ TEST_CASE("Mutation application", "[reproduction]") {
         std::vector<uint8_t> genome(100, 42);
         std::vector<uint8_t> original = genome;
 
-        ReproductionSystem::apply_mutations(genome, 1.0f, 16, rng);
+        ReproductionSystem::apply_mutations(genome, 1.0f, rng);
 
         // Most bytes should have changed
         int changes = 0;
@@ -139,7 +139,7 @@ TEST_CASE("Mutation application", "[reproduction]") {
     SECTION("Mutations stay within bounds") {
         std::vector<uint8_t> genome(100, 128);
 
-        ReproductionSystem::apply_mutations(genome, 1.0f, 200, rng);
+        ReproductionSystem::apply_mutations(genome, 1.0f, rng);
 
         for (auto byte : genome) {
             REQUIRE(byte >= 0);

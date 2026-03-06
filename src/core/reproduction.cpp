@@ -163,7 +163,6 @@ std::vector<uint8_t> ReproductionSystem::recombine_genomes(
 void ReproductionSystem::apply_mutations(
     std::vector<uint8_t>& genome,
     float mutation_rate,
-    uint8_t /*mutation_magnitude*/,
     std::mt19937_64& rng)
 {
     if (genome.empty()) return;
@@ -250,7 +249,7 @@ std::optional<Seed> ReproductionSystem::create_seed(
     }
 
     // Apply mutations
-    apply_mutations(offspring_genome, cfg.mutation_rate, cfg.mutation_magnitude, rng);
+    apply_mutations(offspring_genome, cfg.mutation_rate, rng);
 
     // Create seed
     Seed seed;
