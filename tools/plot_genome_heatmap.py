@@ -14,6 +14,7 @@ Usage:
     python tools/plot_genome_heatmap.py logs/genomes.parquet --max-plants 300
     python tools/plot_genome_heatmap.py logs/genomes.parquet --no-cluster --output fig.png
     python tools/plot_genome_heatmap.py logs/genomes.parquet --filter-tick-born-max 500
+    python tools/plot_genome_heatmap.py logs/genomes.parquet --min-ticks-lived 200
 
 Requirements:
     pip install pyarrow numpy matplotlib
@@ -21,6 +22,7 @@ Requirements:
 """
 
 import argparse
+import os
 import sys
 
 import numpy as np
@@ -76,6 +78,57 @@ def cluster_order(dist: np.ndarray) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
+# Lifetime helpers
+# ---------------------------------------------------------------------------
+
+def _load_lifetimes(genomes_path: str) -> tuple[dict[int, int], int] | None:
+    """Load death ticks and final tick from sibling parquet files.
+
+    Returns ({plant_id: death_tick}, final_tick) or None if the required
+    files are not found.  Plants with no death entry are still alive;
+    their lifetime is computed as final_tick - tick_born.
+    """
+    log_dir = os.path.dirname(os.path.abspath(genomes_path))
+
+    events_path = os.path.join(log_dir, "plant_events.parquet")
+    stats_path  = os.path.join(log_dir, "tick_stats.parquet")
+
+    if not os.path.exists(events_path):
+        print(f"[WARN] {events_path} not found — cannot filter by lifetime.",
+              file=sys.stderr)
+        return None
+
+    events = pq.read_table(events_path, columns=["tick", "event", "plant_id"])
+    death_mask = [e == "death" for e in events["event"].to_pylist()]
+    death_ticks: dict[int, int] = {}
+    for pid, tick, is_death in zip(
+        events["plant_id"].to_pylist(),
+        events["tick"].to_pylist(),
+        death_mask,
+    ):
+        if is_death:
+            death_ticks[pid] = tick
+
+    # Determine final simulation tick.
+    final_tick = 0
+    if os.path.exists(stats_path):
+        stats = pq.read_table(stats_path, columns=["tick"])
+        ticks = stats["tick"].to_pylist()
+        final_tick = max(ticks) if ticks else 0
+    elif death_ticks:
+        final_tick = max(death_ticks.values())
+
+    return death_ticks, final_tick
+
+
+def compute_lifetime(plant_id: int, tick_born: int,
+                     death_ticks: dict[int, int], final_tick: int) -> int:
+    """Ticks a plant lived: from birth to death, or to end of run."""
+    end = death_ticks.get(plant_id, final_tick)
+    return max(0, end - tick_born)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -91,6 +144,9 @@ def main():
                         help="Only include plants born at or after this tick")
     parser.add_argument("--filter-tick-born-max", type=int, default=None,
                         help="Only include plants born at or before this tick")
+    parser.add_argument("--min-ticks-lived", type=int, default=None,
+                        help="Only include plants that lived for at least N ticks "
+                             "(uses plant_events.parquet + tick_stats.parquet from same dir)")
     parser.add_argument("--no-cluster", action="store_true",
                         help="Skip hierarchical clustering reorder")
     parser.add_argument("--cmap", default="inferno",
@@ -109,12 +165,25 @@ def main():
     ticks_born = table["tick_born"].to_pylist()
     raw_genomes = table["genome"]  # pyarrow BinaryArray
 
+    # ── Lifetime data (loaded lazily only when needed) ────────────────────────
+    lifetime_data = None
+    if args.min_ticks_lived is not None:
+        lifetime_data = _load_lifetimes(args.parquet)
+
     # ── Filter ───────────────────────────────────────────────────────────────
     mask = [True] * len(plant_ids)
     if args.filter_tick_born_min is not None:
         mask = [m and t >= args.filter_tick_born_min for m, t in zip(mask, ticks_born)]
     if args.filter_tick_born_max is not None:
         mask = [m and t <= args.filter_tick_born_max for m, t in zip(mask, ticks_born)]
+    if args.min_ticks_lived is not None and lifetime_data is not None:
+        death_ticks, final_tick = lifetime_data
+        print(f"Filtering: min_ticks_lived={args.min_ticks_lived}  "
+              f"final_tick={final_tick}")
+        mask = [
+            m and compute_lifetime(pid, tb, death_ticks, final_tick) >= args.min_ticks_lived
+            for m, pid, tb in zip(mask, plant_ids, ticks_born)
+        ]
 
     indices = [i for i, m in enumerate(mask) if m]
     if not indices:
