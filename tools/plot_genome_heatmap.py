@@ -37,6 +37,7 @@ try:
     import matplotlib
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
+    plt.style.use("dark_background")
 except ImportError:
     print("matplotlib required:  pip install matplotlib", file=sys.stderr)
     sys.exit(1)

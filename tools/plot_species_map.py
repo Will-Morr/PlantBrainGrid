@@ -50,6 +50,7 @@ except ImportError:
 try:
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
+    plt.style.use("dark_background")
 except ImportError:
     print("matplotlib required:  pip install matplotlib", file=sys.stderr)
     sys.exit(1)
