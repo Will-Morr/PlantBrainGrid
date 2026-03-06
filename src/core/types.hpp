@@ -66,13 +66,10 @@ inline bool is_valid_placeable_cell(CellType type) {
 }
 
 enum class RecombinationMethod : uint8_t {
-    MotherOnly = 0,
-    FatherOnly = 1,
+    RandomMix = 0,
+    Alternating = 1,
     Mother75 = 2,
-    Father75 = 3,
-    HalfHalf = 4,
-    RandomMix = 5,
-    Alternating = 6
+    Father75 = 3
 };
 
 enum class SeedPlacementMode : uint8_t {

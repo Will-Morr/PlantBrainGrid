@@ -626,7 +626,7 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
             QueuedAction action;
             action.type = ActionType::LaunchSeed;
             action.seed_params = QueuedAction::SeedParams{
-                static_cast<RecombinationMethod>(recomb % 7),
+                static_cast<RecombinationMethod>(recomb % 4),
                 energy,
                 water,
                 nutrients,

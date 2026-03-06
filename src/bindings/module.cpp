@@ -42,11 +42,8 @@ PYBIND11_MODULE(_plantbraingrid, m) {
 
     // RecombinationMethod
     py::enum_<RecombinationMethod>(m, "RecombinationMethod")
-        .value("MotherOnly", RecombinationMethod::MotherOnly)
-        .value("FatherOnly", RecombinationMethod::FatherOnly)
         .value("Mother75", RecombinationMethod::Mother75)
         .value("Father75", RecombinationMethod::Father75)
-        .value("HalfHalf", RecombinationMethod::HalfHalf)
         .value("RandomMix", RecombinationMethod::RandomMix)
         .value("Alternating", RecombinationMethod::Alternating);
 

@@ -45,12 +45,10 @@ main:
     PLACE_CELL FiberRoot, +0, +1
 
 reproduce:
-    ; 499 HALTs to accumulate ~750E (1.5 E/tick × 499 ticks) before launching.
-    ; This guarantees viable seeds even for winter-born offspring.
-    .fill 499, 0x01
+    .fill 100, 0x01
 
     MATE_BY_SIZE 128, 1
-    LAUNCH_SEED Alternating, 120, 80, 50, 15, +0, +0, random
+    LAUNCH_SEED RandomMix, 120, 80, 50, 15, +0, +0, random
 
 done:
     HALT

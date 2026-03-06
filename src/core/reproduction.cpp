@@ -166,24 +166,12 @@ std::vector<uint8_t> ReproductionSystem::recombine_genomes(
         uint8_t f_byte = (i < father_genome.size()) ? father_genome[i] : 0;
 
         switch (method) {
-            case RecombinationMethod::MotherOnly:
-                offspring[i] = m_byte;
-                break;
-
-            case RecombinationMethod::FatherOnly:
-                offspring[i] = f_byte;
-                break;
-
             case RecombinationMethod::Mother75:
                 offspring[i] = (prob(rng) < 0.75f) ? m_byte : f_byte;
                 break;
 
             case RecombinationMethod::Father75:
                 offspring[i] = (prob(rng) < 0.75f) ? f_byte : m_byte;
-                break;
-
-            case RecombinationMethod::HalfHalf:
-                offspring[i] = (i < size / 2) ? m_byte : f_byte;
                 break;
 
             case RecombinationMethod::RandomMix:
