@@ -59,11 +59,11 @@ main:
     ; PLACE_CELL SmallLeaf, +1,  0, North
     ; PLACE_CELL SmallLeaf, -1,  0, North
 
-    PLACE_CELL SmallLeaf, +0, -1
+    ; PLACE_CELL SmallLeaf, +0, -1
 
-    ; PLACE_CELL SmallLeaf, -1, +0
-    ; PLACE_CELL SmallLeaf, +1, +0
-    ; PLACE_CELL FiberRoot, +0, +1
+    PLACE_CELL SmallLeaf, -1, +0
+    PLACE_CELL SmallLeaf, +1, +0
+    PLACE_CELL FiberRoot, +0, +1
 reproduce:
     ; --- Reproduction check ---
     ; 220 bytes / 2.55 ≈ 86 units > 72-unit seed cost, so launch is always
