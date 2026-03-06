@@ -61,8 +61,8 @@ main:
 
     ; PLACE_CELL SmallLeaf, +0, -1
 
-    PLACE_CELL SmallLeaf, -1, +0
-    PLACE_CELL SmallLeaf, +1, +0
+    PLACE_CELL Anther,    +0, -1
+    PLACE_CELL SmallLeaf, +0, +2
     PLACE_CELL FiberRoot, +0, +1
 reproduce:
     ; --- Reproduction check ---
