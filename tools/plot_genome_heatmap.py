@@ -10,11 +10,11 @@ Optionally reorders plants by hierarchical clustering so related lineages
 cluster together (requires scipy).
 
 Usage:
-    python tools/plot_genome_heatmap.py logs/genomes.parquet
-    python tools/plot_genome_heatmap.py logs/genomes.parquet --max-plants 300
-    python tools/plot_genome_heatmap.py logs/genomes.parquet --no-cluster --output fig.png
-    python tools/plot_genome_heatmap.py logs/genomes.parquet --filter-tick-born-max 500
-    python tools/plot_genome_heatmap.py logs/genomes.parquet --min-ticks-lived 200
+    python tools/plot_genome_heatmap.py logs/
+    python tools/plot_genome_heatmap.py logs/ --max-plants 300
+    python tools/plot_genome_heatmap.py logs/ --no-cluster --output fig.png
+    python tools/plot_genome_heatmap.py logs/ --filter-tick-born-max 500
+    python tools/plot_genome_heatmap.py logs/ --min-ticks-lived 200
 
 Requirements:
     pip install pyarrow numpy matplotlib
@@ -81,15 +81,13 @@ def cluster_order(dist: np.ndarray) -> np.ndarray:
 # Lifetime helpers
 # ---------------------------------------------------------------------------
 
-def _load_lifetimes(genomes_path: str) -> tuple[dict[int, int], int] | None:
-    """Load death ticks and final tick from sibling parquet files.
+def _load_lifetimes(log_dir: str) -> tuple[dict[int, int], int] | None:
+    """Load death ticks and final tick from log_dir.
 
     Returns ({plant_id: death_tick}, final_tick) or None if the required
     files are not found.  Plants with no death entry are still alive;
     their lifetime is computed as final_tick - tick_born.
     """
-    log_dir = os.path.dirname(os.path.abspath(genomes_path))
-
     events_path = os.path.join(log_dir, "plant_events.parquet")
     stats_path  = os.path.join(log_dir, "tick_stats.parquet")
 
@@ -137,7 +135,7 @@ def main():
         description="Pairwise genome-difference heatmap from genomes.parquet",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("parquet",              help="Path to genomes.parquet")
+    parser.add_argument("log_dir",              help="Path to the log directory containing Parquet files")
     parser.add_argument("--max-plants", type=int, default=400,
                         help="Cap number of plants plotted (random subsample if exceeded)")
     parser.add_argument("--filter-tick-born-min", type=int, default=None,
@@ -159,8 +157,14 @@ def main():
     args = parser.parse_args()
 
     # ── Load data ────────────────────────────────────────────────────────────
-    print(f"Loading {args.parquet} ...")
-    table = pq.read_table(args.parquet)
+    log_dir = os.path.abspath(args.log_dir)
+    genomes_path = os.path.join(log_dir, "genomes.parquet")
+    if not os.path.exists(genomes_path):
+        print(f"[ERR] {genomes_path} not found", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Loading {genomes_path} ...")
+    table = pq.read_table(genomes_path)
     plant_ids  = table["plant_id"].to_pylist()
     ticks_born = table["tick_born"].to_pylist()
     raw_genomes = table["genome"]  # pyarrow BinaryArray
@@ -168,7 +172,7 @@ def main():
     # ── Lifetime data (loaded lazily only when needed) ────────────────────────
     lifetime_data = None
     if args.min_ticks_lived is not None:
-        lifetime_data = _load_lifetimes(args.parquet)
+        lifetime_data = _load_lifetimes(log_dir)
 
     # ── Filter ───────────────────────────────────────────────────────────────
     mask = [True] * len(plant_ids)
