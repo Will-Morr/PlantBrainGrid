@@ -433,6 +433,10 @@ class Visualizer:
             (CellType.Bark,          "Bark",            (101, 67, 33)),
             (CellType.Thorn,         "Thorn",          (128, 128, 128)),
             (CellType.FireStarter,   "FireStarter",    (255, 69, 0)),
+            (CellType.StoreEnergy,   "StoreEnergy",    (255, 200, 50)),
+            (CellType.StoreWater,    "StoreWater",     (50, 150, 255)),
+            (CellType.StoreNutrients,"StoreNutrients", (180, 120, 60)),
+            (CellType.Haustorium,    "Haustorium",     (200, 0, 0)),
         ]
         present = [(name, color, type_counts[ct]) for ct, name, color in cell_type_names if ct in type_counts]
 
