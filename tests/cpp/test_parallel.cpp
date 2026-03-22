@@ -380,8 +380,9 @@ TEST_CASE("TapRoot water extraction", "[parallel][resources]") {
 
         // Extraction = water_level * rate (multiplicative model)
         REQUIRE(water_tap > water_fiber);
-        REQUIRE_THAT(water_tap,   WithinAbs(100.f * cfg.tap_root_water_rate,   0.1f));
-        REQUIRE_THAT(water_fiber, WithinAbs(100.f * cfg.fiber_root_water_rate, 0.1f));
+        float wm = world.current_water_multiplier();
+        REQUIRE_THAT(water_tap,   WithinAbs(100.f * cfg.tap_root_water_rate * wm,   0.1f));
+        REQUIRE_THAT(water_fiber, WithinAbs(100.f * cfg.fiber_root_water_rate * wm, 0.1f));
     }
 
     SECTION("TapRoot does not extract nutrients") {
@@ -431,8 +432,8 @@ TEST_CASE("Primary cell water draw", "[parallel][resources]") {
 
         sim.advance_tick();
 
-        // primary water draw = water_level * primary_water_rate (multiplicative model)
-        float expected = 100.f * cfg.primary_water_rate;
+        // primary water draw = water_level * primary_water_rate * water_mult
+        float expected = 100.f * cfg.primary_water_rate * sim.world().current_water_multiplier();
         REQUIRE(p->resources().water > 0.0f);
         REQUIRE_THAT(p->resources().water, WithinAbs(expected, 0.5f));
     }

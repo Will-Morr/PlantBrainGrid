@@ -50,6 +50,7 @@ constexpr uint8_t OP_SENSE_SELF_WATER = 0x47;
 constexpr uint8_t OP_SENSE_SELF_NUTRIENTS = 0x48;
 constexpr uint8_t OP_SENSE_CELL_COUNT = 0x49;
 constexpr uint8_t OP_SENSE_AGE = 0x4A;
+constexpr uint8_t OP_SENSE_SEASON = 0x4B;
 
 // Plant Actions (0x60-0x7F)
 constexpr uint8_t OP_PLACE_CELL = 0x60;

@@ -99,11 +99,37 @@ void World::regenerate_terrain() {
     initialize_terrain();
 }
 
-float World::current_light_multiplier() const {
+size_t World::current_season_index() const {
     const auto& cfg = get_config();
-    float phase = 2.0f * 3.14159265358979f * static_cast<float>(tick_) /
-                  static_cast<float>(cfg.season_length);
-    return cfg.base_light + cfg.light_amplitude * std::sin(phase);
+    if (cfg.seasons.empty()) return 0;
+
+    uint32_t cycle_tick = static_cast<uint32_t>(tick_ % cfg.season_cycle_length);
+
+    // Find the season with the largest start_tick <= cycle_tick
+    size_t idx = 0;
+    for (size_t i = 1; i < cfg.seasons.size(); ++i) {
+        if (cfg.seasons[i].start_tick <= cycle_tick) {
+            idx = i;
+        }
+    }
+    return idx;
+}
+
+const SeasonDef& World::current_season() const {
+    const auto& cfg = get_config();
+    return cfg.seasons[current_season_index()];
+}
+
+float World::current_light_multiplier() const {
+    return current_season().light_mult;
+}
+
+float World::current_water_multiplier() const {
+    return current_season().water_mult;
+}
+
+float World::current_nutrient_multiplier() const {
+    return current_season().nutrient_mult;
 }
 
 void World::update_season() {

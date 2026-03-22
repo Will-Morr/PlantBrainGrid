@@ -70,7 +70,7 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def_readwrite("mutation_rate", &Config::mutation_rate)
         .def_readwrite("mutation_block_min_size", &Config::mutation_block_min_size)
         .def_readwrite("mutation_block_max_size", &Config::mutation_block_max_size)
-        .def_readwrite("season_length", &Config::season_length)
+        .def_readwrite("season_cycle_length", &Config::season_cycle_length)
         .def_readwrite("fire_spread_ticks", &Config::fire_spread_ticks)
         .def_readwrite("fire_destroy_ticks", &Config::fire_destroy_ticks)
         .def_readwrite("primary_costs", &Config::primary_costs)
@@ -110,6 +110,9 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def("cell_at", py::overload_cast<const GridCoord&>(&World::cell_at),
              py::return_value_policy::reference)
         .def("current_light_multiplier", &World::current_light_multiplier)
+        .def("current_water_multiplier", &World::current_water_multiplier)
+        .def("current_nutrient_multiplier", &World::current_nutrient_multiplier)
+        .def("current_season_index", &World::current_season_index)
         .def("ignite", &World::ignite)
         .def("advance_tick", &World::advance_tick)
         .def("regenerate_terrain", &World::regenerate_terrain);

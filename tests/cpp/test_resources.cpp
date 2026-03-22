@@ -95,7 +95,7 @@ TEST_CASE("Root water extraction", "[resources]") {
 
         // Extraction = water_level * rate (multiplicative model)
         REQUIRE(extracted > 0.0f);
-        REQUIRE_THAT(extracted, WithinAbs(initial_water * cfg.fiber_root_water_rate, 0.01f));
+        REQUIRE_THAT(extracted, WithinAbs(initial_water * cfg.fiber_root_water_rate * world.current_water_multiplier(), 0.01f));
         // World water is infinite — cell level is not depleted
         REQUIRE(world.cell_at(root_pos).water_level == initial_water);
     }
@@ -114,7 +114,7 @@ TEST_CASE("Root water extraction", "[resources]") {
         float extracted = ResourceSystem::calculate_root_water(plant, world);
 
         // Extraction = water_level * rate (multiplicative model)
-        REQUIRE_THAT(extracted, WithinAbs(low_water * cfg.fiber_root_water_rate, 0.01f));
+        REQUIRE_THAT(extracted, WithinAbs(low_water * cfg.fiber_root_water_rate * world.current_water_multiplier(), 0.01f));
         // Cell level is not depleted (infinite supply)
         REQUIRE_THAT(world.cell_at(root_pos).water_level, WithinAbs(low_water, 0.01f));
     }
@@ -157,7 +157,7 @@ TEST_CASE("Root nutrient extraction", "[resources]") {
 
         // Extraction = nutrient_level * rate (multiplicative model)
         REQUIRE(extracted > 0.0f);
-        REQUIRE_THAT(extracted, WithinAbs(initial_nutrients * cfg.fiber_root_nutrient_rate, 0.01f));
+        REQUIRE_THAT(extracted, WithinAbs(initial_nutrients * cfg.fiber_root_nutrient_rate * world.current_nutrient_multiplier(), 0.01f));
         // World nutrients are infinite — cell level is not depleted
         REQUIRE(world.cell_at(root_pos).nutrient_level == initial_nutrients);
     }
@@ -354,17 +354,17 @@ TEST_CASE("Seasonal light affects energy", "[resources]") {
 
         plant.place_cell(CellType::SmallLeaf, {51, 50}, world);
 
-        // Get energy at start
-        float energy_start = ResourceSystem::calculate_leaf_energy(plant, world);
+        // Spring: light_mult = 1.0
+        float energy_spring = ResourceSystem::calculate_leaf_energy(plant, world);
 
-        // Advance to different season (quarter cycle)
-        for (uint32_t i = 0; i < cfg.season_length / 4; ++i) {
+        // Advance to Summer (tick 200): light_mult = 2.0
+        for (uint32_t i = 0; i < 200; ++i) {
             world.advance_tick();
         }
 
-        float energy_quarter = ResourceSystem::calculate_leaf_energy(plant, world);
+        float energy_summer = ResourceSystem::calculate_leaf_energy(plant, world);
 
-        // Energy should be different at different seasons
-        REQUIRE(energy_start != energy_quarter);
+        // Summer has 2x light, so energy should be doubled
+        REQUIRE_THAT(energy_summer, WithinRel(energy_spring * 2.0f, 0.01f));
     }
 }

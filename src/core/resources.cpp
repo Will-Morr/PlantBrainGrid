@@ -21,7 +21,8 @@ ResourceTickResult ResourceSystem::process_tick(Plant& plant, World& world) {
     const auto& cfg_tick = get_config();
     if (world.in_bounds(plant.primary_position())) {
         WorldCell& pwc = world.cell_at(plant.primary_position());
-        result.water_extracted += pwc.water_level*cfg_tick.primary_water_rate;
+        result.water_extracted += pwc.water_level * cfg_tick.primary_water_rate
+                                 * world.current_water_multiplier();
     }
 
     // 2. Add generated resources to plant pool
@@ -68,6 +69,7 @@ float ResourceSystem::calculate_leaf_energy(const Plant& plant, const World& wor
 float ResourceSystem::calculate_root_water(const Plant& plant, World& world) {
     const auto& cfg = get_config();
     float total_water = 0.0f;
+    float water_mult = world.current_water_multiplier();
 
     for (const auto& cell : plant.cells()) {
         if (!cell.enabled) continue;
@@ -75,12 +77,12 @@ float ResourceSystem::calculate_root_water(const Plant& plant, World& world) {
         if (cell.type == CellType::FiberRoot) {
             if (world.in_bounds(cell.position)) {
                 WorldCell& wc = world.cell_at(cell.position);
-                total_water += wc.water_level*cfg.fiber_root_water_rate;
+                total_water += wc.water_level * cfg.fiber_root_water_rate * water_mult;
             }
         } else if (cell.type == CellType::TapRoot) {
             if (world.in_bounds(cell.position)) {
                 WorldCell& wc = world.cell_at(cell.position);
-                total_water += wc.water_level*cfg.tap_root_water_rate;
+                total_water += wc.water_level * cfg.tap_root_water_rate * water_mult;
             }
         }
     }
@@ -91,6 +93,7 @@ float ResourceSystem::calculate_root_water(const Plant& plant, World& world) {
 float ResourceSystem::calculate_root_nutrients(const Plant& plant, World& world) {
     const auto& cfg = get_config();
     float total_nutrients = 0.0f;
+    float nutrient_mult = world.current_nutrient_multiplier();
 
     for (const auto& cell : plant.cells()) {
         if (!cell.enabled) continue;
@@ -98,7 +101,7 @@ float ResourceSystem::calculate_root_nutrients(const Plant& plant, World& world)
 
         if (world.in_bounds(cell.position)) {
             WorldCell& wc = world.cell_at(cell.position);
-            float extract = wc.nutrient_level*cfg.fiber_root_nutrient_rate;
+            float extract = wc.nutrient_level * cfg.fiber_root_nutrient_rate * nutrient_mult;
             total_nutrients += extract;
         }
     }

@@ -43,9 +43,13 @@ public:
     bool in_bounds(int32_t x, int32_t y) const;
     bool in_bounds(const GridCoord& coord) const;
 
-    // Season/light
+    // Seasons
     void update_season();
+    size_t current_season_index() const;
+    const SeasonDef& current_season() const;
     float current_light_multiplier() const;
+    float current_water_multiplier() const;
+    float current_nutrient_multiplier() const;
 
     // Fire
     void ignite(const GridCoord& coord);

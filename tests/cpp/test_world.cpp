@@ -126,34 +126,43 @@ TEST_CASE("World seasons", "[world]") {
     World world(10, 10, 42);
     const auto& cfg = get_config();
 
-    SECTION("Light varies with ticks") {
-        float initial_light = world.current_light_multiplier();
-
-        // Advance to quarter season
-        for (uint32_t i = 0; i < cfg.season_length / 4; ++i) {
-            world.advance_tick();
-        }
-        float quarter_light = world.current_light_multiplier();
-
-        // Light should have changed
-        REQUIRE(initial_light != quarter_light);
+    SECTION("Starts in first season (Spring)") {
+        REQUIRE(world.current_season_index() == 0);
+        REQUIRE(world.current_light_multiplier() == cfg.seasons[0].light_mult);
+        REQUIRE(world.current_water_multiplier() == cfg.seasons[0].water_mult);
+        REQUIRE(world.current_nutrient_multiplier() == cfg.seasons[0].nutrient_mult);
     }
 
-    SECTION("Light completes full cycle") {
-        float initial_light = world.current_light_multiplier();
-
-        // Advance full season
-        for (uint32_t i = 0; i < cfg.season_length; ++i) {
+    SECTION("Season changes at correct tick boundaries") {
+        // Advance to Summer (tick 200)
+        for (uint32_t i = 0; i < 200; ++i) {
             world.advance_tick();
         }
-        float final_light = world.current_light_multiplier();
+        REQUIRE(world.current_season_index() == 1);
+        REQUIRE(world.current_light_multiplier() == cfg.seasons[1].light_mult);
 
-        // Should return to approximately the same value
-        REQUIRE_THAT(final_light, WithinAbs(initial_light, 0.01f));
+        // Advance to Winter (tick 400)
+        for (uint32_t i = 0; i < 200; ++i) {
+            world.advance_tick();
+        }
+        REQUIRE(world.current_season_index() == 2);
+        REQUIRE(world.current_light_multiplier() == cfg.seasons[2].light_mult);
+    }
+
+    SECTION("Seasons cycle after full period") {
+        // Advance full cycle (600 ticks) to return to Spring
+        for (uint32_t i = 0; i < cfg.season_cycle_length; ++i) {
+            world.advance_tick();
+        }
+        REQUIRE(world.current_season_index() == 0);
+        REQUIRE(world.current_light_multiplier() == cfg.seasons[0].light_mult);
     }
 
     SECTION("update_season updates all cells") {
-        world.advance_tick();
+        // Advance to Summer for a different light value
+        for (uint32_t i = 0; i < 200; ++i) {
+            world.advance_tick();
+        }
         float expected_light = world.current_light_multiplier();
 
         for (int32_t y = 0; y < 10; ++y) {

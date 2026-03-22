@@ -511,6 +511,13 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
             break;
         }
 
+        case OP_SENSE_SEASON: {
+            uint16_t dest = read_arg16();
+            uint8_t value = static_cast<uint8_t>(world.current_season_index());
+            safe_write(dest, value);
+            break;
+        }
+
         // Plant Actions
         case OP_PLACE_CELL: {
             uint8_t type_byte = read_arg();

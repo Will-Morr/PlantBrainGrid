@@ -1,8 +1,20 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace pbg {
+
+// A discrete season with multipliers for light, water, and nutrients.
+// Seasons are ordered; start_tick is the offset within the cycle.
+struct SeasonDef {
+    std::string name;
+    uint32_t start_tick = 0;
+    float light_mult = 1.0f;
+    float water_mult = 1.0f;
+    float nutrient_mult = 1.0f;
+};
 
 struct CellCosts {
     float build_energy = 0.0f;
@@ -75,10 +87,13 @@ struct Config {
     uint32_t max_cell_age = 1000;   // ticks before a cell dies of old age (0 = disabled)
     uint32_t max_plant_age = 5000; // ticks before a plant dies of old age (0 = disabled)
 
-    // Seasons
-    uint32_t season_length = 500;
-    float base_light = 1.0f;
-    float light_amplitude = 0.75f;
+    // Seasons (discrete)
+    uint32_t season_cycle_length = 600;
+    std::vector<SeasonDef> seasons = {
+        {"Spring",  0,   1.0f, 2.0f, 1.0f},
+        {"Summer",  200, 2.0f, 1.0f, 1.0f},
+        {"Winter",  400, 0.0f, 0.0f, 1.0f},
+    };
 
     // Scaling for brain sensing (convert float resources to 0-255 byte)
     float resource_sense_scale = 2.55f;  // 100 resource = 255 byte value
