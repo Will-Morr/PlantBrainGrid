@@ -49,6 +49,7 @@ OPCODES: Dict[int, Tuple[str, int]] = {
     0x48: ("SENSE_SELF_NUTRIENTS", 2),
     0x49: ("SENSE_CELL_COUNT", 2),
     0x4A: ("SENSE_AGE", 2),
+    0x4B: ("SENSE_SEASON", 2),
     # Plant Actions
     0x60: ("PLACE_CELL", 3),     # type, dx, dy
     0x61: ("ROTATE_CELL", 3),    # dx, dy, rotation (NOP)
@@ -76,8 +77,7 @@ CELL_TYPE_NAMES = {
 }
 
 RECOMB_NAMES = {
-    0: "MotherOnly", 1: "FatherOnly", 2: "Mother75", 3: "Father75",
-    4: "HalfHalf", 5: "RandomMix", 6: "Alternating"
+    0: "RandomMix", 1: "Alternating", 2: "Mother75", 3: "Father75",
 }
 
 
@@ -110,6 +110,23 @@ def decode_instruction(mem: bytes, ip: int) -> Optional[Tuple[str, List[int], in
     return (name, args, ip)
 
 
+NUM_REGISTERS = 8
+
+
+def _fmt_addr(addr: int) -> str:
+    """Format a 16-bit address with register notation.
+
+    MSB clear          → normal address  [0x1234]
+    MSB set, bit14 clear → register      [r0]-[r7]
+    MSB set, bit14 set   → last register [LAST]
+    """
+    if not (addr & 0x8000):
+        return f"[0x{addr:04X}]"
+    if not (addr & 0x4000):
+        return f"[r{addr % NUM_REGISTERS}]"
+    return "[LAST]"
+
+
 def format_instruction(name: str, args: List[int]) -> str:
     """Format an instruction into a human-readable string."""
     if name in ("NOP", "HALT", "RET"):
@@ -124,44 +141,45 @@ def format_instruction(name: str, args: List[int]) -> str:
     if name == "JUMP_IF_ZERO":
         test = args[0] | (args[1] << 8)
         dest = args[2] | (args[3] << 8)
-        return f"JUMP_IF_ZERO [0x{test:04X}], 0x{dest:04X}"
+        return f"JUMP_IF_ZERO {_fmt_addr(test)}, 0x{dest:04X}"
     if name == "JUMP_IF_NEQ":
         test = args[0] | (args[1] << 8)
         val = args[2]
         dest = args[3] | (args[4] << 8)
-        return f"JUMP_IF_NEQ [0x{test:04X}], {val}, 0x{dest:04X}"
+        return f"JUMP_IF_NEQ {_fmt_addr(test)}, {val}, 0x{dest:04X}"
     if name == "CALL":
         addr = args[0] | (args[1] << 8)
         return f"CALL 0x{addr:04X}"
     if name == "LOAD_IMM":
         dest = args[0] | (args[1] << 8)
-        return f"LOAD_IMM [0x{dest:04X}], {args[2]}"
+        return f"LOAD_IMM {_fmt_addr(dest)}, {args[2]}"
     if name in ("COPY", "NOT", "LOAD_IND", "STORE_IND"):
         a = args[0] | (args[1] << 8)
         b = args[2] | (args[3] << 8)
-        return f"{name} [0x{a:04X}], [0x{b:04X}]"
+        return f"{name} {_fmt_addr(a)}, {_fmt_addr(b)}"
     if name in ("ADD", "SUB", "MUL", "DIV", "MOD", "AND", "OR", "XOR",
                 "CMP_LT", "CMP_EQ"):
         dest = args[0] | (args[1] << 8)
         a = args[2] | (args[3] << 8)
         b = args[4] | (args[5] << 8)
-        return f"{name} [0x{dest:04X}], [0x{a:04X}], [0x{b:04X}]"
+        return f"{name} {_fmt_addr(dest)}, {_fmt_addr(a)}, {_fmt_addr(b)}"
     if name in ("SHL", "SHR"):
         dest = args[0] | (args[1] << 8)
         src = args[2] | (args[3] << 8)
-        return f"{name} [0x{dest:04X}], [0x{src:04X}], {args[4]}"
+        return f"{name} {_fmt_addr(dest)}, {_fmt_addr(src)}, {args[4]}"
     if name == "RANDOMIZE":
         start = args[0] | (args[1] << 8)
-        return f"RANDOMIZE 0x{start:04X}, {args[2]}"
+        return f"RANDOMIZE {_fmt_addr(start)}, {args[2]}"
     if name in ("SENSE_WATER", "SENSE_NUTRIENTS", "SENSE_CELL", "SENSE_FIRE", "SENSE_OWNED"):
         dest = args[0] | (args[1] << 8)
         dx = args[2] if args[2] < 128 else args[2] - 256
         dy = args[3] if args[3] < 128 else args[3] - 256
-        return f"{name} [0x{dest:04X}], ({dx:+d},{dy:+d})"
+        return f"{name} {_fmt_addr(dest)}, ({dx:+d},{dy:+d})"
     if name in ("SENSE_LIGHT", "SENSE_SELF_ENERGY", "SENSE_SELF_WATER",
-                "SENSE_SELF_NUTRIENTS", "SENSE_CELL_COUNT", "SENSE_AGE"):
+                "SENSE_SELF_NUTRIENTS", "SENSE_CELL_COUNT", "SENSE_AGE",
+                "SENSE_SEASON"):
         dest = args[0] | (args[1] << 8)
-        return f"{name} [0x{dest:04X}]"
+        return f"{name} {_fmt_addr(dest)}"
     if name == "PLACE_CELL":
         ctype = CELL_TYPE_NAMES.get(args[0] % 10, f"Type{args[0]}")
         dx = args[1] if args[1] < 128 else args[1] - 256
@@ -188,7 +206,7 @@ def format_instruction(name: str, args: List[int]) -> str:
         ctype = CELL_TYPE_NAMES.get(args[1] % 10, f"Type{args[1]}")
         return f"MATE_BY_CELL_COUNT max_dist={args[0]}, type={ctype}, target={args[2]}, magnitude={args[3]}"
     if name == "LAUNCH_SEED":
-        recomb = RECOMB_NAMES.get(args[0] % 7, f"Recomb{args[0]}")
+        recomb = RECOMB_NAMES.get(args[0] % 4, f"Recomb{args[0]}")
         dx = args[5] if args[5] < 128 else args[5] - 256
         dy = args[6] if args[6] < 128 else args[6] - 256
         return (f"LAUNCH_SEED {recomb}, energy={args[1]}, water={args[2]}, "

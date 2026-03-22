@@ -282,21 +282,42 @@ class Visualizer:
 
         # Draw plant cells
         if self.show_plants:
+            # Inset in pixels for edges with no same-plant neighbor
+            inset = max(1, cell_px // 6)
+
             for plant in plants:
                 if not plant.is_alive():
                     continue
 
                 is_selected = self.selected_plant_id == plant.id()
 
+                # Build set of occupied positions for fast neighbor lookup
+                occupied = set()
                 for cell in plant.cells():
-                    sx, sy = self.camera.world_to_screen(cell.position.x, cell.position.y)
+                    occupied.add((cell.position.x, cell.position.y))
+
+                for cell in plant.cells():
+                    cx, cy = cell.position.x, cell.position.y
+                    sx, sy = self.camera.world_to_screen(cx, cy)
+
+                    # Compute per-edge insets
+                    left   = inset if (cx - 1, cy) not in occupied else 0
+                    right  = inset if (cx + 1, cy) not in occupied else 0
+                    top    = inset if (cx, cy - 1) not in occupied else 0
+                    bottom = inset if (cx, cy + 1) not in occupied else 0
+
+                    rx = int(sx) + left
+                    ry = int(sy) + top
+                    rw = cell_px - left - right
+                    rh = cell_px - top - bottom
 
                     color = CELL_COLORS.get(int(cell.type), (255, 0, 240))
                     if not cell.enabled:
                         color = tuple(c // 2 for c in color)
 
-                    rl.draw_rectangle(int(sx), int(sy), cell_px, cell_px,
-                                      rl.Color(color[0], color[1], color[2], 255))
+                    if rw > 0 and rh > 0:
+                        rl.draw_rectangle(rx, ry, rw, rh,
+                                          rl.Color(color[0], color[1], color[2], 255))
 
                     if is_selected:
                         rl.draw_rectangle_lines(int(sx), int(sy), cell_px, cell_px,
@@ -337,6 +358,8 @@ class Visualizer:
         rl.draw_rectangle(0, 0, self.width, 25, rl.Color(0, 0, 0, 180))
         rl.draw_text(status, 10, 5, 16, rl.Color(255, 255, 255, 255))
 
+        self._draw_season_box(world)
+
         if self.selected_plant_id is not None:
             for plant in plants:
                 if plant.id() == self.selected_plant_id:
@@ -345,6 +368,43 @@ class Visualizer:
                         mem_bottom = self._draw_memory_panel(plant)
                         self._draw_trace_panel(mem_bottom + 6)
                     break
+
+    def _draw_season_box(self, world):
+        """Draw a box showing the current season and its multipliers."""
+        try:
+            from _plantbraingrid import get_config
+        except ImportError:
+            return
+
+        cfg = get_config()
+        if not cfg.seasons:
+            return
+
+        idx = world.current_season_index()
+        season = cfg.seasons[idx]
+
+        panel_width = 170
+        panel_height = 78
+        panel_x = self.width - panel_width - 10
+        panel_y = self.height - panel_height - 10
+
+        rl.draw_rectangle(panel_x, panel_y, panel_width, panel_height,
+                          rl.Color(0, 0, 0, 200))
+        rl.draw_rectangle_lines(panel_x, panel_y, panel_width, panel_height,
+                                rl.Color(180, 180, 180, 255))
+
+        y = panel_y + 5
+        rl.draw_text(f"Season: {season.name}", panel_x + 5, y, 14,
+                     rl.Color(255, 255, 255, 255))
+        y += 18
+        rl.draw_text(f"Light:     x{season.light_mult:.1f}", panel_x + 5, y, 13,
+                     rl.Color(255, 255, 100, 255))
+        y += 16
+        rl.draw_text(f"Water:     x{season.water_mult:.1f}", panel_x + 5, y, 13,
+                     rl.Color(100, 150, 255, 255))
+        y += 16
+        rl.draw_text(f"Nutrients: x{season.nutrient_mult:.1f}", panel_x + 5, y, 13,
+                     rl.Color(139, 100, 80, 255))
 
     def _draw_plant_info(self, plant):
         """Draw info panel for selected plant."""

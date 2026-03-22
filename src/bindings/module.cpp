@@ -47,6 +47,15 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .value("RandomMix", RecombinationMethod::RandomMix)
         .value("Alternating", RecombinationMethod::Alternating);
 
+    // SeasonDef
+    py::class_<SeasonDef>(m, "SeasonDef")
+        .def(py::init<>())
+        .def_readwrite("name", &SeasonDef::name)
+        .def_readwrite("start_tick", &SeasonDef::start_tick)
+        .def_readwrite("light_mult", &SeasonDef::light_mult)
+        .def_readwrite("water_mult", &SeasonDef::water_mult)
+        .def_readwrite("nutrient_mult", &SeasonDef::nutrient_mult);
+
     // CellCosts
     py::class_<CellCosts>(m, "CellCosts")
         .def(py::init<>())
@@ -71,6 +80,7 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def_readwrite("mutation_block_min_size", &Config::mutation_block_min_size)
         .def_readwrite("mutation_block_max_size", &Config::mutation_block_max_size)
         .def_readwrite("season_cycle_length", &Config::season_cycle_length)
+        .def_readwrite("seasons", &Config::seasons)
         .def_readwrite("fire_spread_ticks", &Config::fire_spread_ticks)
         .def_readwrite("fire_destroy_ticks", &Config::fire_destroy_ticks)
         .def_readwrite("primary_costs", &Config::primary_costs)
