@@ -20,79 +20,126 @@ static Plant make_test_plant(uint64_t id, const GridCoord& pos) {
 TEST_CASE("Genome recombination", "[reproduction]") {
     std::mt19937_64 rng(42);
 
-    std::vector<uint8_t> mother_genome(100, 0xAA);
-    std::vector<uint8_t> father_genome(100, 0x55);
+    // Set both active and inactive to same value per parent so the
+    // random active/inactive pick doesn't affect these method-focused tests.
+    std::vector<uint8_t> mother_active(100, 0xAA);
+    std::vector<uint8_t> mother_inactive(100, 0xAA);
+    std::vector<uint8_t> father_active(100, 0x55);
+    std::vector<uint8_t> father_inactive(100, 0x55);
 
     SECTION("Mother75 biases toward mother's genome") {
-        auto offspring = ReproductionSystem::recombine_genomes(
-            mother_genome, father_genome, RecombinationMethod::Mother75, rng);
+        auto result = ReproductionSystem::recombine_genomes(
+            mother_active, mother_inactive, father_active, father_inactive,
+            RecombinationMethod::Mother75, rng);
 
         int mother_count = 0;
-        for (auto byte : offspring) {
+        for (auto byte : result.active) {
             if (byte == 0xAA) ++mother_count;
         }
-        // Expect roughly 75% mother bytes
         REQUIRE(mother_count > 60);
         REQUIRE(mother_count < 100);
     }
 
     SECTION("Father75 biases toward father's genome") {
-        auto offspring = ReproductionSystem::recombine_genomes(
-            mother_genome, father_genome, RecombinationMethod::Father75, rng);
+        auto result = ReproductionSystem::recombine_genomes(
+            mother_active, mother_inactive, father_active, father_inactive,
+            RecombinationMethod::Father75, rng);
 
         int father_count = 0;
-        for (auto byte : offspring) {
+        for (auto byte : result.active) {
             if (byte == 0x55) ++father_count;
         }
-        // Expect roughly 75% father bytes
         REQUIRE(father_count > 60);
         REQUIRE(father_count < 100);
     }
 
     SECTION("Alternating alternates bytes") {
-        auto offspring = ReproductionSystem::recombine_genomes(
-            mother_genome, father_genome, RecombinationMethod::Alternating, rng);
+        auto result = ReproductionSystem::recombine_genomes(
+            mother_active, mother_inactive, father_active, father_inactive,
+            RecombinationMethod::Alternating, rng);
 
         for (size_t i = 0; i < 100; ++i) {
             if (i % 2 == 0) {
-                REQUIRE(offspring[i] == 0xAA);
+                REQUIRE(result.active[i] == 0xAA);
             } else {
-                REQUIRE(offspring[i] == 0x55);
+                REQUIRE(result.active[i] == 0x55);
             }
         }
     }
 
     SECTION("RandomMix produces mixed result") {
-        auto offspring = ReproductionSystem::recombine_genomes(
-            mother_genome, father_genome, RecombinationMethod::RandomMix, rng);
+        auto result = ReproductionSystem::recombine_genomes(
+            mother_active, mother_inactive, father_active, father_inactive,
+            RecombinationMethod::RandomMix, rng);
 
         int mother_count = 0, father_count = 0;
-        for (auto byte : offspring) {
+        for (auto byte : result.active) {
             if (byte == 0xAA) ++mother_count;
             if (byte == 0x55) ++father_count;
         }
-
-        // Should have a mix (probabilistic, but very unlikely to be all one)
         REQUIRE(mother_count > 0);
         REQUIRE(father_count > 0);
     }
 
     SECTION("Mother75 favors mother") {
-        // Run multiple times to get statistical significance
         int mother_total = 0, father_total = 0;
 
         for (int trial = 0; trial < 10; ++trial) {
-            auto offspring = ReproductionSystem::recombine_genomes(
-                mother_genome, father_genome, RecombinationMethod::Mother75, rng);
+            auto result = ReproductionSystem::recombine_genomes(
+                mother_active, mother_inactive, father_active, father_inactive,
+                RecombinationMethod::Mother75, rng);
 
-            for (auto byte : offspring) {
+            for (auto byte : result.active) {
                 if (byte == 0xAA) ++mother_total;
                 if (byte == 0x55) ++father_total;
             }
         }
-
-        // Mother should have significantly more
         REQUIRE(mother_total > father_total * 2);
+    }
+
+    SECTION("Inactive brain gets the non-selected parent byte") {
+        auto result = ReproductionSystem::recombine_genomes(
+            mother_active, mother_inactive, father_active, father_inactive,
+            RecombinationMethod::Alternating, rng);
+
+        // Alternating: even→mother active, odd→father active
+        // So inactive should be the opposite parent's contribution
+        for (size_t i = 0; i < 100; ++i) {
+            if (i % 2 == 0) {
+                REQUIRE(result.active[i] == 0xAA);
+                REQUIRE(result.inactive[i] == 0x55);
+            } else {
+                REQUIRE(result.active[i] == 0x55);
+                REQUIRE(result.inactive[i] == 0xAA);
+            }
+        }
+    }
+
+    SECTION("All parent genes are preserved in child") {
+        // With distinct active/inactive per parent, every byte from both
+        // parents appears in either the child's active or inactive brain.
+        std::vector<uint8_t> m_active(100, 0x11);
+        std::vector<uint8_t> m_inactive(100, 0x22);
+        std::vector<uint8_t> f_active(100, 0x33);
+        std::vector<uint8_t> f_inactive(100, 0x44);
+
+        auto result = ReproductionSystem::recombine_genomes(
+            m_active, m_inactive, f_active, f_inactive,
+            RecombinationMethod::RandomMix, rng);
+
+        for (size_t i = 0; i < 100; ++i) {
+            // One of active/inactive comes from mother, other from father
+            uint8_t a = result.active[i];
+            uint8_t b = result.inactive[i];
+            // a and b should be one mother byte and one father byte
+            bool a_from_mother = (a == 0x11 || a == 0x22);
+            bool a_from_father = (a == 0x33 || a == 0x44);
+            bool b_from_mother = (b == 0x11 || b == 0x22);
+            bool b_from_father = (b == 0x33 || b == 0x44);
+            // One from each parent
+            REQUIRE(((a_from_mother && b_from_father) ||
+                     (a_from_father && b_from_mother)));
+        }
     }
 }
 

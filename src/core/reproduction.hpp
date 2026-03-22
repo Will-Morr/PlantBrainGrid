@@ -12,7 +12,8 @@ namespace pbg {
 class World;
 
 struct Seed {
-    std::vector<uint8_t> genome;
+    std::vector<uint8_t> genome;           // Active brain genome
+    std::vector<uint8_t> inactive_genome;  // Inactive brain genome (carried for reproduction)
     float energy = 0.0f;
     float water = 0.0f;
     float nutrients = 0.0f;
@@ -33,6 +34,12 @@ struct MateCandidate {
     float distance = 0.0f;
 };
 
+// Result of genome recombination: both active and inactive brains
+struct RecombinationResult {
+    std::vector<uint8_t> active;
+    std::vector<uint8_t> inactive;
+};
+
 class ReproductionSystem {
 public:
     // Perform mate selection for a plant based on its brain's search state
@@ -43,10 +50,15 @@ public:
         const MateSearchState& search_state,
         std::mt19937_64& rng);
 
-    // Create offspring genome using recombination
-    static std::vector<uint8_t> recombine_genomes(
-        const std::vector<uint8_t>& mother_genome,
-        const std::vector<uint8_t>& father_genome,
+    // Create offspring genomes using recombination.
+    // Each parent randomly sends from their active or inactive byte per position.
+    // The recombination method picks which parent's byte goes to active;
+    // the other parent's byte goes to inactive.
+    static RecombinationResult recombine_genomes(
+        const std::vector<uint8_t>& mother_active,
+        const std::vector<uint8_t>& mother_inactive,
+        const std::vector<uint8_t>& father_active,
+        const std::vector<uint8_t>& father_inactive,
         RecombinationMethod method,
         std::mt19937_64& rng);
 

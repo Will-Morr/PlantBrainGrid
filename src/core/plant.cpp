@@ -6,10 +6,11 @@
 
 namespace pbg {
 
-Plant::Plant(uint64_t id, const GridCoord& primary_pos, const std::vector<uint8_t>& genome)
+Plant::Plant(uint64_t id, const GridCoord& primary_pos, const std::vector<uint8_t>& genome,
+             const std::vector<uint8_t>& inactive_genome)
     : id_(id)
     , primary_pos_(primary_pos)
-    , brain_(std::make_unique<Brain>(genome))
+    , brain_(std::make_unique<Brain>(genome, inactive_genome))
 {
     // Create primary cell
     PlantCell primary;

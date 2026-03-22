@@ -48,7 +48,8 @@ struct Resources {
 
 class Plant {
 public:
-    Plant(uint64_t id, const GridCoord& primary_pos, const std::vector<uint8_t>& genome);
+    Plant(uint64_t id, const GridCoord& primary_pos, const std::vector<uint8_t>& genome,
+          const std::vector<uint8_t>& inactive_genome = {});
     ~Plant();
 
     // Disable copying (plants own resources)

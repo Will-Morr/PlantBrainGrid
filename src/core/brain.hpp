@@ -75,18 +75,23 @@ static constexpr uint8_t NUM_REGISTERS = 8;
 
 class Brain {
 public:
-    explicit Brain(const std::vector<uint8_t>& genome);
+    explicit Brain(const std::vector<uint8_t>& genome,
+                   const std::vector<uint8_t>& inactive_genome = {});
     Brain(size_t size = 1024);
 
-    // Memory access
+    // Memory access (active brain)
     uint8_t read(uint16_t addr) const;
     void write(uint16_t addr, uint8_t value);
     void randomize_range(uint16_t start, uint16_t length, std::mt19937_64& rng);
 
-    // Memory inspection
+    // Active memory inspection
     const std::vector<uint8_t>& memory() const { return memory_; }
     std::vector<uint8_t>& memory() { return memory_; }
     size_t size() const { return memory_.size(); }
+
+    // Inactive memory (carried for reproduction, never executed)
+    const std::vector<uint8_t>& inactive_memory() const { return inactive_memory_; }
+    std::vector<uint8_t>& inactive_memory() { return inactive_memory_; }
 
     // Instruction pointer
     uint16_t ip() const { return ip_; }
@@ -117,7 +122,8 @@ public:
     bool stack_empty() const { return call_stack_.empty(); }
 
 private:
-    std::vector<uint8_t> memory_;
+    std::vector<uint8_t> memory_;           // Active brain (executed)
+    std::vector<uint8_t> inactive_memory_;  // Inactive brain (carried for reproduction)
     uint16_t ip_ = NUM_REGISTERS;
     bool halted_ = false;
     bool trace_enabled_ = false;

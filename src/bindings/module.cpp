@@ -159,6 +159,9 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         })
         .def("memory", [](const Brain& b) {
             return py::bytes(reinterpret_cast<const char*>(b.memory().data()), b.memory().size());
+        })
+        .def("inactive_memory", [](const Brain& b) {
+            return py::bytes(reinterpret_cast<const char*>(b.inactive_memory().data()), b.inactive_memory().size());
         });
 
     // Plant
@@ -184,6 +187,7 @@ PYBIND11_MODULE(_plantbraingrid, m) {
     py::class_<Seed>(m, "Seed")
         .def(py::init<>())
         .def_readwrite("genome", &Seed::genome)
+        .def_readwrite("inactive_genome", &Seed::inactive_genome)
         .def_readwrite("energy", &Seed::energy)
         .def_readwrite("water", &Seed::water)
         .def_readwrite("nutrients", &Seed::nutrients)

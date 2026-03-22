@@ -595,11 +595,17 @@ void Simulation::save_state(const std::string& filename) const {
         file.write(reinterpret_cast<const char*>(&water), sizeof(water));
         file.write(reinterpret_cast<const char*>(&nutrients), sizeof(nutrients));
 
-        // Write genome
+        // Write active genome
         const auto& genome = plant.brain().memory();
         uint64_t genome_size = genome.size();
         file.write(reinterpret_cast<const char*>(&genome_size), sizeof(genome_size));
         file.write(reinterpret_cast<const char*>(genome.data()), genome_size);
+
+        // Write inactive genome
+        const auto& inactive = plant.brain().inactive_memory();
+        uint64_t inactive_size = inactive.size();
+        file.write(reinterpret_cast<const char*>(&inactive_size), sizeof(inactive_size));
+        file.write(reinterpret_cast<const char*>(inactive.data()), inactive_size);
     }
 }
 
@@ -657,8 +663,15 @@ void Simulation::load_state(const std::string& filename) {
         std::vector<uint8_t> genome(genome_size);
         file.read(reinterpret_cast<char*>(genome.data()), genome_size);
 
+        // Read inactive genome
+        uint64_t inactive_size;
+        file.read(reinterpret_cast<char*>(&inactive_size), sizeof(inactive_size));
+
+        std::vector<uint8_t> inactive_genome(inactive_size);
+        file.read(reinterpret_cast<char*>(inactive_genome.data()), inactive_size);
+
         // Recreate plant (simplified - doesn't restore cells)
-        plants_.emplace_back(id, GridCoord{px, py}, genome);
+        plants_.emplace_back(id, GridCoord{px, py}, genome, inactive_genome);
         Plant& plant = plants_.back();
         plant.resources() = Resources{energy, water, nutrients};
         if (!alive) plant.kill();

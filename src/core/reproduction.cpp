@@ -150,41 +150,61 @@ float ReproductionSystem::get_criterion_value(const Plant& plant, const MateCrit
     }
 }
 
-std::vector<uint8_t> ReproductionSystem::recombine_genomes(
-    const std::vector<uint8_t>& mother_genome,
-    const std::vector<uint8_t>& father_genome,
+RecombinationResult ReproductionSystem::recombine_genomes(
+    const std::vector<uint8_t>& mother_active,
+    const std::vector<uint8_t>& mother_inactive,
+    const std::vector<uint8_t>& father_active,
+    const std::vector<uint8_t>& father_inactive,
     RecombinationMethod method,
     std::mt19937_64& rng)
 {
-    size_t size = std::max(mother_genome.size(), father_genome.size());
-    std::vector<uint8_t> offspring(size, 0);
+    size_t size = std::max({mother_active.size(), mother_inactive.size(),
+                           father_active.size(), father_inactive.size()});
+    RecombinationResult result;
+    result.active.resize(size, 0);
+    result.inactive.resize(size, 0);
+
+    auto safe_get = [](const std::vector<uint8_t>& v, size_t i) -> uint8_t {
+        return (i < v.size()) ? v[i] : 0;
+    };
 
     std::uniform_real_distribution<float> prob(0.0f, 1.0f);
 
     for (size_t i = 0; i < size; ++i) {
-        uint8_t m_byte = (i < mother_genome.size()) ? mother_genome[i] : 0;
-        uint8_t f_byte = (i < father_genome.size()) ? father_genome[i] : 0;
+        // Each parent randomly sends from their active or inactive copy
+        uint8_t m_byte = (prob(rng) < 0.5f)
+            ? safe_get(mother_active, i) : safe_get(mother_inactive, i);
+        uint8_t f_byte = (prob(rng) < 0.5f)
+            ? safe_get(father_active, i) : safe_get(father_inactive, i);
 
+        // Recombination method picks which parent's byte goes to active;
+        // the other goes to inactive.
+        bool pick_mother;
         switch (method) {
             case RecombinationMethod::Mother75:
-                offspring[i] = (prob(rng) < 0.75f) ? m_byte : f_byte;
+                pick_mother = prob(rng) < 0.75f;
                 break;
-
             case RecombinationMethod::Father75:
-                offspring[i] = (prob(rng) < 0.75f) ? f_byte : m_byte;
+                pick_mother = prob(rng) < 0.25f;
                 break;
-
             case RecombinationMethod::RandomMix:
-                offspring[i] = (prob(rng) < 0.5f) ? m_byte : f_byte;
+                pick_mother = prob(rng) < 0.5f;
                 break;
-
             case RecombinationMethod::Alternating:
-                offspring[i] = (i % 2 == 0) ? m_byte : f_byte;
+                pick_mother = (i % 2 == 0);
                 break;
+        }
+
+        if (pick_mother) {
+            result.active[i] = m_byte;
+            result.inactive[i] = f_byte;
+        } else {
+            result.active[i] = f_byte;
+            result.inactive[i] = m_byte;
         }
     }
 
-    return offspring;
+    return result;
 }
 
 void ReproductionSystem::apply_mutations(
@@ -263,19 +283,23 @@ std::optional<Seed> ReproductionSystem::create_seed(
     mother.resources().water -= water_cost;
     mother.resources().nutrients -= nutrient_cost;
 
-    // Create offspring genome via recombination
-    std::vector<uint8_t> offspring_genome = recombine_genomes(
+    // Create offspring genomes via recombination (both active and inactive)
+    RecombinationResult offspring = recombine_genomes(
         mother.brain().memory(),
+        mother.brain().inactive_memory(),
         father.brain().memory(),
+        father.brain().inactive_memory(),
         params.recomb_method,
         rng);
 
-    // Apply mutations
-    apply_mutations(offspring_genome, cfg.mutation_rate, rng);
+    // Apply mutations to both active and inactive genomes
+    apply_mutations(offspring.active, cfg.mutation_rate, rng);
+    apply_mutations(offspring.inactive, cfg.mutation_rate, rng);
 
     // Create seed
     Seed seed;
-    seed.genome = std::move(offspring_genome);
+    seed.genome = std::move(offspring.active);
+    seed.inactive_genome = std::move(offspring.inactive);
     seed.energy = energy_cost;
     seed.water = water_cost;
     seed.nutrients = nutrient_cost;
@@ -377,8 +401,8 @@ std::optional<Plant> ReproductionSystem::try_germinate(
         return std::nullopt;
     }
 
-    // Create new plant
-    Plant new_plant(new_plant_id, seed.position, seed.genome);
+    // Create new plant with both active and inactive genomes
+    Plant new_plant(new_plant_id, seed.position, seed.genome, seed.inactive_genome);
     new_plant.resources().energy = seed.energy;
     new_plant.resources().water = seed.water;
     new_plant.resources().nutrients = seed.nutrients;
