@@ -68,7 +68,18 @@ struct Config {
     CellCosts bark_costs            = { 0,   1,   1,   0,     0.01, 0.01};
     CellCosts thorn_costs           = { 5,   0,   0,   0,     0.01, 0   };
     CellCosts fire_starter_costs    = { 30,  0,   0,   0,     0,    0   };
-    
+    CellCosts store_energy_costs   = { 10,  0,   0,   0,     0.02, 0   };
+    CellCosts store_water_costs    = { 10,  0,   0,   0,     0.02, 0   };
+    CellCosts store_nutrients_costs= { 10,  0,   0,   0,     0.02, 0   };
+    CellCosts haustorium_costs     = { 10,  0,   0,   0.05,  0,    0   };
+
+    // Resource storage caps
+    float base_resource_cap = 200.0f;         // Base max for each resource
+    float store_capacity_bonus = 300.0f;      // Extra cap per store cell
+
+    // Haustorium
+    float haustorium_steal_rate = 0.5f;       // Resources stolen per adjacent enemy per tick
+
     // Reproduction
     float mutation_rate = 0.001f;
     uint16_t mutation_block_min_size = 1;   // min bytes in per-seed block mutation

@@ -402,6 +402,53 @@ void Simulation::process_thorn_damage() {
     }
 }
 
+void Simulation::process_haustorium() {
+    const auto& cfg = get_config();
+    static const GridCoord offsets[] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+
+    struct StealEvent {
+        uint64_t thief_id;
+        uint64_t victim_id;
+    };
+    std::vector<StealEvent> events;
+
+    for (const auto& thief : plants_) {
+        if (!thief.is_alive()) continue;
+
+        for (const auto& cell : thief.cells()) {
+            if (cell.type != CellType::Haustorium) continue;
+
+            for (const auto& offset : offsets) {
+                GridCoord neighbor = cell.position + offset;
+                if (!world_.in_bounds(neighbor)) continue;
+
+                const WorldCell& wc = world_.cell_at(neighbor);
+                if (!wc.is_occupied() || wc.plant_id == thief.id()) continue;
+
+                events.push_back({thief.id(), wc.plant_id});
+            }
+        }
+    }
+
+    for (const auto& ev : events) {
+        Plant* thief = find_plant(ev.thief_id);
+        Plant* victim = find_plant(ev.victim_id);
+        if (!thief || !thief->is_alive() || !victim || !victim->is_alive()) continue;
+
+        float steal_energy = std::min(cfg.haustorium_steal_rate, victim->resources().energy);
+        float steal_water = std::min(cfg.haustorium_steal_rate, victim->resources().water);
+        float steal_nutrients = std::min(cfg.haustorium_steal_rate, victim->resources().nutrients);
+
+        victim->resources().energy -= steal_energy;
+        victim->resources().water -= steal_water;
+        victim->resources().nutrients -= steal_nutrients;
+
+        thief->resources().energy += steal_energy;
+        thief->resources().water += steal_water;
+        thief->resources().nutrients += steal_nutrients;
+    }
+}
+
 void Simulation::check_plant_deaths() {
     for (auto& plant : plants_) {
         if (!plant.is_alive()) continue;
@@ -450,6 +497,9 @@ TickStats Simulation::advance_tick() {
 
     // 8. Thorns damage adjacent enemy cells
     process_thorn_damage();
+
+    // 8.5 Haustoria steal resources from adjacent enemies
+    process_haustorium();
 
     // 9. Update seeds in flight
     update_seeds();

@@ -114,6 +114,9 @@ private:
     // Thorns damage adjacent cells belonging to other plants
     void process_thorn_damage();
 
+    // Haustoria steal resources from adjacent enemy plants
+    void process_haustorium();
+
     // Kill plants that have run out of energy or water
     void check_starvation();
 

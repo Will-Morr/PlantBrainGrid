@@ -38,7 +38,11 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .value("Anther", CellType::Anther)
         .value("Bark", CellType::Bark)
         .value("Thorn", CellType::Thorn)
-        .value("FireStarter", CellType::FireStarter);
+        .value("FireStarter", CellType::FireStarter)
+        .value("StoreEnergy", CellType::StoreEnergy)
+        .value("StoreWater", CellType::StoreWater)
+        .value("StoreNutrients", CellType::StoreNutrients)
+        .value("Haustorium", CellType::Haustorium);
 
     // RecombinationMethod
     py::enum_<RecombinationMethod>(m, "RecombinationMethod")
@@ -91,7 +95,14 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def_readwrite("anther_costs", &Config::anther_costs)
         .def_readwrite("bark_costs", &Config::bark_costs)
         .def_readwrite("thorn_costs", &Config::thorn_costs)
-        .def_readwrite("fire_starter_costs", &Config::fire_starter_costs);
+        .def_readwrite("fire_starter_costs", &Config::fire_starter_costs)
+        .def_readwrite("store_energy_costs", &Config::store_energy_costs)
+        .def_readwrite("store_water_costs", &Config::store_water_costs)
+        .def_readwrite("store_nutrients_costs", &Config::store_nutrients_costs)
+        .def_readwrite("haustorium_costs", &Config::haustorium_costs)
+        .def_readwrite("base_resource_cap", &Config::base_resource_cap)
+        .def_readwrite("store_capacity_bonus", &Config::store_capacity_bonus)
+        .def_readwrite("haustorium_steal_rate", &Config::haustorium_steal_rate);
 
     m.def("get_config", &get_config, py::return_value_policy::reference);
 

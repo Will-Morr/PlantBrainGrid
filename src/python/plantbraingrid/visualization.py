@@ -30,6 +30,10 @@ CELL_COLORS = {
     7: (128, 128, 128),   # Thorn (gray)
     8: (255, 69, 0),      # FireStarter (red-orange)
     9: (110, 55, 90),     # TapRoot (purplish brown)
+    10: (255, 200, 50),   # StoreEnergy (gold)
+    11: (50, 150, 255),   # StoreWater (blue)
+    12: (180, 120, 60),   # StoreNutrients (tan)
+    13: (200, 0, 0),      # Haustorium (red)
 }
 
 WATER_COLOR = (0, 100, 200, 100)

@@ -340,7 +340,7 @@ TEST_CASE("Parallel placement conflict resolution", "[parallel][simulation]") {
         Simulation sim(50, 50, 42);
         Plant* p = sim.add_plant({25, 25}, genome);
         REQUIRE(p != nullptr);
-        p->resources() = Resources{500.f, 500.f, 100.f};
+        p->resources() = Resources{150.f, 150.f, 100.f};
         float e0 = p->resources().energy;
 
         sim.advance_tick();

@@ -58,7 +58,11 @@ enum class CellType : uint8_t {
     Bark = 6,
     Thorn = 7,
     FireStarter = 8,
-    TapRoot = 9
+    TapRoot = 9,
+    StoreEnergy = 10,
+    StoreWater = 11,
+    StoreNutrients = 12,
+    Haustorium = 13
 };
 
 inline bool is_valid_placeable_cell(CellType type) {

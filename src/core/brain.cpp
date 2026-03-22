@@ -524,7 +524,7 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
             int8_t dx = read_arg_signed();
             int8_t dy = read_arg_signed();
 
-            CellType type = static_cast<CellType>(type_byte % 10);
+            CellType type = static_cast<CellType>(type_byte % 14);
             GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
 
             QueuedAction action;

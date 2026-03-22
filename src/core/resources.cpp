@@ -30,6 +30,9 @@ ResourceTickResult ResourceSystem::process_tick(Plant& plant, World& world) {
     plant.resources().water += result.water_extracted;
     plant.resources().nutrients += result.nutrients_extracted;
 
+    // 2.5 Clamp resources to storage caps
+    clamp_to_caps(plant);
+
     // 3. Pay maintenance costs
     Resources maintenance = calculate_maintenance(plant);
     result.energy_maintenance = maintenance.energy;
@@ -121,6 +124,30 @@ Resources ResourceSystem::calculate_maintenance(const Plant& plant) {
     }
 
     return total;
+}
+
+Resources ResourceSystem::calculate_caps(const Plant& plant) {
+    const auto& cfg = get_config();
+    Resources caps(cfg.base_resource_cap, cfg.base_resource_cap, cfg.base_resource_cap);
+
+    for (const auto& cell : plant.cells()) {
+        if (cell.type == CellType::StoreEnergy) {
+            caps.energy += cfg.store_capacity_bonus;
+        } else if (cell.type == CellType::StoreWater) {
+            caps.water += cfg.store_capacity_bonus;
+        } else if (cell.type == CellType::StoreNutrients) {
+            caps.nutrients += cfg.store_capacity_bonus;
+        }
+    }
+
+    return caps;
+}
+
+void ResourceSystem::clamp_to_caps(Plant& plant) {
+    Resources caps = calculate_caps(plant);
+    if (plant.resources().energy > caps.energy) plant.resources().energy = caps.energy;
+    if (plant.resources().water > caps.water) plant.resources().water = caps.water;
+    if (plant.resources().nutrients > caps.nutrients) plant.resources().nutrients = caps.nutrients;
 }
 
 }  // namespace pbg

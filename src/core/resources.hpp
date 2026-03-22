@@ -38,6 +38,12 @@ public:
 
     // Calculate total maintenance costs
     static Resources calculate_maintenance(const Plant& plant);
+
+    // Calculate resource storage caps based on store cells
+    static Resources calculate_caps(const Plant& plant);
+
+    // Clamp plant resources to their caps
+    static void clamp_to_caps(Plant& plant);
 };
 
 }  // namespace pbg

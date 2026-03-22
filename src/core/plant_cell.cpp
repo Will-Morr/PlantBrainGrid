@@ -16,6 +16,10 @@ const CellCosts& get_cell_costs(CellType type) {
         case CellType::Bark:           return cfg.bark_costs;
         case CellType::Thorn:          return cfg.thorn_costs;
         case CellType::FireStarter:    return cfg.fire_starter_costs;
+        case CellType::StoreEnergy:    return cfg.store_energy_costs;
+        case CellType::StoreWater:     return cfg.store_water_costs;
+        case CellType::StoreNutrients: return cfg.store_nutrients_costs;
+        case CellType::Haustorium:     return cfg.haustorium_costs;
         default: {
             static const CellCosts empty{};
             return empty;

@@ -73,7 +73,8 @@ NUM_OPCODES = 0xA0
 CELL_TYPE_NAMES = {
     0: "Empty", 1: "Primary", 2: "SmallLeaf", 3: "BigLeaf",
     4: "FiberRoot", 5: "Anther", 6: "Bark", 7: "Thorn",
-    8: "FireStarter", 9: "TapRoot",
+    8: "FireStarter", 9: "TapRoot", 10: "StoreEnergy",
+    11: "StoreWater", 12: "StoreNutrients", 13: "Haustorium",
 }
 
 RECOMB_NAMES = {
@@ -181,7 +182,7 @@ def format_instruction(name: str, args: List[int]) -> str:
         dest = args[0] | (args[1] << 8)
         return f"{name} {_fmt_addr(dest)}"
     if name == "PLACE_CELL":
-        ctype = CELL_TYPE_NAMES.get(args[0] % 10, f"Type{args[0]}")
+        ctype = CELL_TYPE_NAMES.get(args[0] % 14, f"Type{args[0]}")
         dx = args[1] if args[1] < 128 else args[1] - 256
         dy = args[2] if args[2] < 128 else args[2] - 256
         return f"PLACE_CELL {ctype}, ({dx:+d},{dy:+d})"
@@ -203,7 +204,7 @@ def format_instruction(name: str, args: List[int]) -> str:
                 "MATE_BY_DIFFERENCE"):
         return f"{name} max_dist={args[0]}, magnitude={args[1]}"
     if name == "MATE_BY_CELL_COUNT":
-        ctype = CELL_TYPE_NAMES.get(args[1] % 10, f"Type{args[1]}")
+        ctype = CELL_TYPE_NAMES.get(args[1] % 14, f"Type{args[1]}")
         return f"MATE_BY_CELL_COUNT max_dist={args[0]}, type={ctype}, target={args[2]}, magnitude={args[3]}"
     if name == "LAUNCH_SEED":
         recomb = RECOMB_NAMES.get(args[0] % 4, f"Recomb{args[0]}")
