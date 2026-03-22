@@ -15,7 +15,8 @@ Simulation::Simulation(uint32_t width, uint32_t height, uint64_t seed)
 {
 }
 
-Plant* Simulation::add_plant(const GridCoord& pos, const std::vector<uint8_t>& genome) {
+Plant* Simulation::add_plant(const GridCoord& pos, const std::vector<uint8_t>& genome,
+                             const std::vector<uint8_t>& inactive_genome) {
     if (!world_.in_bounds(pos)) {
         return nullptr;
     }
@@ -24,7 +25,7 @@ Plant* Simulation::add_plant(const GridCoord& pos, const std::vector<uint8_t>& g
         return nullptr;
     }
 
-    plants_.emplace_back(next_plant_id_++, pos, genome);
+    plants_.emplace_back(next_plant_id_++, pos, genome, inactive_genome);
     Plant& plant = plants_.back();
 
     // Register primary cell with world
@@ -513,7 +514,7 @@ Plant* Simulation::spawn_random_plant() {
             b = static_cast<uint8_t>(byte_dist(world_.rng()));
         }
 
-        Plant* plant = add_plant(pos, genome);
+        Plant* plant = add_plant(pos, genome, genome);
         if (plant) {
             plant->resources().energy = auto_spawn_energy_;
             plant->resources().water = auto_spawn_water_;

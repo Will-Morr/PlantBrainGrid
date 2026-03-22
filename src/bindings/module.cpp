@@ -222,7 +222,8 @@ PYBIND11_MODULE(_plantbraingrid, m) {
         .def("plants", &Simulation::plants, py::return_value_policy::reference)
         .def("seeds", &Simulation::seeds, py::return_value_policy::reference)
         .def("tick", &Simulation::tick)
-        .def("add_plant", &Simulation::add_plant, py::return_value_policy::reference)
+        .def("add_plant", &Simulation::add_plant, py::return_value_policy::reference,
+             py::arg("pos"), py::arg("genome"), py::arg("inactive_genome") = std::vector<uint8_t>())
         .def("find_plant", py::overload_cast<uint64_t>(&Simulation::find_plant),
              py::return_value_policy::reference)
         .def("remove_dead_plants", &Simulation::remove_dead_plants)

@@ -41,7 +41,8 @@ public:
     uint64_t next_plant_id() const { return next_plant_id_; }
 
     // Plant management
-    Plant* add_plant(const GridCoord& pos, const std::vector<uint8_t>& genome);
+    Plant* add_plant(const GridCoord& pos, const std::vector<uint8_t>& genome,
+                     const std::vector<uint8_t>& inactive_genome = {});
     Plant* find_plant(uint64_t id);
     const Plant* find_plant(uint64_t id) const;
     void remove_dead_plants();
