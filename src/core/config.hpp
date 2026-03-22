@@ -52,7 +52,7 @@ struct Config {
     float big_leaf_water_cost = 2.0f;
     float big_leaf_nutrient_cost = 1.5f;
     float primary_water_rate = 0.2f;       // small water draw from primary cell
-    float fiber_root_water_rate = 1.5f;
+    float fiber_root_water_rate = 1.2f;
     float fiber_root_nutrient_rate = 1.0f;
     float tap_root_water_rate = 3.5f;      // tap root draws more water, no nutrients
 
@@ -71,10 +71,10 @@ struct Config {
     CellCosts store_energy_costs   = { 10,  0,   0,   0,     0.02, 0   };
     CellCosts store_water_costs    = { 10,  0,   0,   0,     0.02, 0   };
     CellCosts store_nutrients_costs= { 10,  0,   0,   0,     0.02, 0   };
-    CellCosts haustorium_costs     = { 10,  0,   0,   0.05,  0,    0   };
+    CellCosts haustorium_costs     = { 10,  0,   0,   0.1,  0,    0   };
 
     // Resource storage caps
-    float base_resource_cap = 200.0f;         // Base max for each resource
+    float base_resource_cap = 300.0f;         // Base max for each resource
     float store_capacity_bonus = 300.0f;      // Extra cap per store cell
 
     // Haustorium
@@ -103,7 +103,8 @@ struct Config {
     std::vector<SeasonDef> seasons = {
         {"Spring",  0,   1.0f, 2.0f, 1.0f},
         {"Summer",  200, 2.0f, 1.0f, 1.0f},
-        {"Winter",  400, 0.0f, 0.0f, 1.0f},
+        {"Fall",  400, 0.5f, 0.5f, 1.0f},
+        {"Winter",  800, 0.3f, 0.0f, 1.0f},
     };
 
     // Scaling for brain sensing (convert float resources to 0-255 byte)

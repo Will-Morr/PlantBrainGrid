@@ -40,7 +40,7 @@
 
 main:
     PLACE_CELL Anther,    +0, -1
-    PLACE_CELL SmallLeaf, +1,  0
+    ; PLACE_CELL SmallLeaf, +1,  0
     PLACE_CELL SmallLeaf, -1,  0
     PLACE_CELL FiberRoot, +0, +1
 
@@ -48,7 +48,7 @@ reproduce:
     .fill 100, 0x01
 
     MATE_BY_SIZE 128, 1
-    LAUNCH_SEED RandomMix, 120, 80, 50, 15, +0, +0, random
+    LAUNCH_SEED RandomMix, 80, 10, 50, 15, +0, +0, random
 
 done:
     HALT
