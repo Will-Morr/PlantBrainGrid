@@ -10,7 +10,7 @@ namespace pbg {
 
 Brain::Brain(const std::vector<uint8_t>& genome, const std::vector<uint8_t>& inactive_genome)
     : memory_(genome)
-    , inactive_memory_(inactive_genome)
+    , inactive_memory_(inactive_genome.empty() ? genome : inactive_genome)
 {
     const auto& cfg = get_config();
     if (memory_.size() < cfg.brain_size) {
