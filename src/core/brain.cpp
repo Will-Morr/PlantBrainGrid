@@ -235,6 +235,36 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
             break;
         }
 
+        case OP_JUMP_GT: {
+            uint16_t a_addr = read_arg16();
+            uint16_t b_addr = read_arg16();
+            uint16_t jump_addr = read_arg16();
+            if (safe_read(a_addr) > safe_read(b_addr)) {
+                ip_ = jump_addr % memory_.size();
+            }
+            break;
+        }
+
+        case OP_JUMP_EQ: {
+            uint16_t a_addr = read_arg16();
+            uint16_t b_addr = read_arg16();
+            uint16_t jump_addr = read_arg16();
+            if (safe_read(a_addr) == safe_read(b_addr)) {
+                ip_ = jump_addr % memory_.size();
+            }
+            break;
+        }
+
+        case OP_JUMP_LT: {
+            uint16_t a_addr = read_arg16();
+            uint16_t b_addr = read_arg16();
+            uint16_t jump_addr = read_arg16();
+            if (safe_read(a_addr) < safe_read(b_addr)) {
+                ip_ = jump_addr % memory_.size();
+            }
+            break;
+        }
+
         // Memory Operations
         case OP_LOAD_IMM: {
             uint16_t addr = read_arg16();

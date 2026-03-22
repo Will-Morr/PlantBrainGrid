@@ -17,6 +17,9 @@ constexpr uint8_t OP_JUMP_IF_ZERO = 0x04;
 constexpr uint8_t OP_JUMP_IF_NEQ = 0x05;
 constexpr uint8_t OP_CALL = 0x06;
 constexpr uint8_t OP_RET = 0x07;
+constexpr uint8_t OP_JUMP_GT = 0x08;   // [a] > [b] → jump
+constexpr uint8_t OP_JUMP_EQ = 0x09;   // [a] == [b] → jump
+constexpr uint8_t OP_JUMP_LT = 0x0A;   // [a] < [b] → jump
 
 // Memory Operations (0x20-0x3F)
 constexpr uint8_t OP_LOAD_IMM = 0x20;

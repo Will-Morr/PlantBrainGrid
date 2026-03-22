@@ -561,7 +561,6 @@ class Visualizer:
         # How many rows fit between top_y and the bottom of the screen
         available_px = self.height - panel_y - 4
         visible_rows = max(1, (available_px - header_height - 8) // row_height)
-        visible_rows = min(visible_rows, 20)
 
         history = self._trace_history[-visible_rows:]
         n_rows = len(history)

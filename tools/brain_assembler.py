@@ -14,6 +14,9 @@ Assembly format:
     JUMP_REL +5          ; or JUMP_REL -3
     JUMP_IF_ZERO [addr], label
     JUMP_IF_NEQ [addr], value, label
+    JUMP_GT [a], [b], label       ; jump if [a] > [b]
+    JUMP_EQ [a], [b], label       ; jump if [a] == [b]
+    JUMP_LT [a], [b], label       ; jump if [a] < [b]
     CALL label
     RET
 
@@ -49,9 +52,10 @@ Assembly format:
     SENSE_SELF_NUTRIENTS [dest]
     SENSE_CELL_COUNT [dest]
     SENSE_AGE [dest]
+    SENSE_SEASON [dest]
 
     ; Plant actions
-    PLACE_CELL type, dx, dy    ; type=SmallLeaf|BigLeaf|FiberRoot|TapRoot|Anther|Bark|Thorn|FireStarter
+    PLACE_CELL type, dx, dy    ; type=SmallLeaf|BigLeaf|FiberRoot|TapRoot|Anther|Bark|Thorn|FireStarter|StoreEnergy|StoreWater|StoreNutrients|Haustorium
     ROTATE_CELL dx, dy, rotation    ; NOP (orientation removed; args consumed for compatibility)
     TOGGLE_CELL dx, dy, ON|OFF|1|0
     REMOVE_CELL dx, dy
@@ -68,7 +72,7 @@ Assembly format:
     MATE_BY_CELL_COUNT  max_dist, cell_type, target_count, magnitude
                                               ; prefer mates with target_count cells of cell_type
     LAUNCH_SEED recomb, energy, water, nutrients, power, dx, dy, placement
-                                         ; recomb=MotherOnly|FatherOnly|Mother75|Father75|HalfHalf|RandomMix|Alternating
+                                         ; recomb=RandomMix|Alternating|Mother75|Father75
                                          ; placement=exact|random
                                          ; if no mate found and no anther plants exist, reproduces asexually
 
@@ -95,6 +99,9 @@ OPCODES = {
     "JUMP_IF_NEQ": (0x05, "addr16 imm8 addr16"),
     "CALL": (0x06, "addr16"),
     "RET": (0x07, 0),
+    "JUMP_GT": (0x08, "addr16 addr16 addr16"),
+    "JUMP_EQ": (0x09, "addr16 addr16 addr16"),
+    "JUMP_LT": (0x0A, "addr16 addr16 addr16"),
     "LOAD_IMM": (0x20, "addr16 imm8"),
     "COPY": (0x21, "addr16 addr16"),
     "ADD": (0x22, "addr16 addr16 addr16"),
@@ -124,6 +131,7 @@ OPCODES = {
     "SENSE_SELF_NUTRIENTS": (0x48, "addr16"),
     "SENSE_CELL_COUNT": (0x49, "addr16"),
     "SENSE_AGE": (0x4A, "addr16"),
+    "SENSE_SEASON": (0x4B, "addr16"),
     "PLACE_CELL": (0x60, "ctype rel8 rel8"),
     "ROTATE_CELL": (0x61, "rel8 rel8 rel8"),
     "TOGGLE_CELL": (0x62, "rel8 rel8 bool"),
@@ -143,12 +151,12 @@ OPCODES = {
 CELL_TYPES = {
     "Empty": 0, "Primary": 1, "SmallLeaf": 2, "BigLeaf": 3,
     "FiberRoot": 4, "Anther": 5, "Bark": 6, "Thorn": 7, "FireStarter": 8,
-    "TapRoot": 9,
+    "TapRoot": 9, "StoreEnergy": 10, "StoreWater": 11, "StoreNutrients": 12,
+    "Haustorium": 13,
 }
 
 RECOMB_METHODS = {
-    "MotherOnly": 0, "FatherOnly": 1, "Mother75": 2, "Father75": 3,
-    "HalfHalf": 4, "RandomMix": 5, "Alternating": 6
+    "RandomMix": 0, "Alternating": 1, "Mother75": 2, "Father75": 3,
 }
 
 
@@ -372,7 +380,7 @@ class BrainAssembler:
                 if ct in CELL_TYPES:
                     self._emit(CELL_TYPES[ct])
                 else:
-                    self._emit(self._parse_int(arg, "cell type") % 10)
+                    self._emit(self._parse_int(arg, "cell type") % 14)
 
             elif fmt_type == "bool":
                 larg = arg.strip().lower()
@@ -388,7 +396,7 @@ class BrainAssembler:
                 if r in RECOMB_METHODS:
                     self._emit(RECOMB_METHODS[r])
                 else:
-                    self._emit(self._parse_int(arg, "recombination") % 7)
+                    self._emit(self._parse_int(arg, "recombination") % 4)
 
             elif fmt_type == "placement":
                 larg = arg.strip().lower()

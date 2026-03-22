@@ -18,6 +18,9 @@ OPCODES: Dict[int, Tuple[str, int]] = {
     0x05: ("JUMP_IF_NEQ", 5),    # test_addr16, val, jump_addr16
     0x06: ("CALL", 2),           # addr16
     0x07: ("RET", 0),
+    0x08: ("JUMP_GT", 6),        # a16, b16, jump_addr16
+    0x09: ("JUMP_EQ", 6),        # a16, b16, jump_addr16
+    0x0A: ("JUMP_LT", 6),        # a16, b16, jump_addr16
     # Memory Operations
     0x20: ("LOAD_IMM", 3),       # dest16, val
     0x21: ("COPY", 4),           # dest16, src16
@@ -148,6 +151,11 @@ def format_instruction(name: str, args: List[int]) -> str:
         val = args[2]
         dest = args[3] | (args[4] << 8)
         return f"JUMP_IF_NEQ {_fmt_addr(test)}, {val}, 0x{dest:04X}"
+    if name in ("JUMP_GT", "JUMP_EQ", "JUMP_LT"):
+        a = args[0] | (args[1] << 8)
+        b = args[2] | (args[3] << 8)
+        dest = args[4] | (args[5] << 8)
+        return f"{name} {_fmt_addr(a)}, {_fmt_addr(b)}, 0x{dest:04X}"
     if name == "CALL":
         addr = args[0] | (args[1] << 8)
         return f"CALL 0x{addr:04X}"

@@ -506,3 +506,109 @@ TEST_CASE("Brain register addressing", "[brain]") {
         REQUIRE(plant.brain().read(40) == 123);
     }
 }
+
+TEST_CASE("Brain conditional jumps (GT/EQ/LT)", "[brain]") {
+    World world(100, 100, 42);
+
+    SECTION("JUMP_GT jumps when a > b") {
+        std::vector<uint8_t> genome(50, OP_NOP);
+        genome[30] = 10;  // a = 10
+        genome[31] = 5;   // b = 5
+        genome[P]     = OP_JUMP_GT;
+        genome[P + 1] = 30; genome[P + 2] = 0;  // addr a
+        genome[P + 3] = 31; genome[P + 4] = 0;  // addr b
+        genome[P + 5] = 40; genome[P + 6] = 0;  // jump addr
+        genome[40] = OP_HALT;
+
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
+
+        REQUIRE(plant.brain().is_halted());
+        REQUIRE(plant.brain().ip() == 41);
+    }
+
+    SECTION("JUMP_GT does not jump when a <= b") {
+        std::vector<uint8_t> genome(50, OP_NOP);
+        genome[30] = 5;  // a = 5
+        genome[31] = 10; // b = 10
+        genome[P]     = OP_JUMP_GT;
+        genome[P + 1] = 30; genome[P + 2] = 0;
+        genome[P + 3] = 31; genome[P + 4] = 0;
+        genome[P + 5] = 40; genome[P + 6] = 0;
+        genome[P + 7] = OP_HALT;
+
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
+
+        REQUIRE(plant.brain().is_halted());
+        REQUIRE(plant.brain().ip() == P + 8);
+    }
+
+    SECTION("JUMP_EQ jumps when a == b") {
+        std::vector<uint8_t> genome(50, OP_NOP);
+        genome[30] = 7;
+        genome[31] = 7;
+        genome[P]     = OP_JUMP_EQ;
+        genome[P + 1] = 30; genome[P + 2] = 0;
+        genome[P + 3] = 31; genome[P + 4] = 0;
+        genome[P + 5] = 40; genome[P + 6] = 0;
+        genome[40] = OP_HALT;
+
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
+
+        REQUIRE(plant.brain().is_halted());
+        REQUIRE(plant.brain().ip() == 41);
+    }
+
+    SECTION("JUMP_EQ does not jump when a != b") {
+        std::vector<uint8_t> genome(50, OP_NOP);
+        genome[30] = 7;
+        genome[31] = 8;
+        genome[P]     = OP_JUMP_EQ;
+        genome[P + 1] = 30; genome[P + 2] = 0;
+        genome[P + 3] = 31; genome[P + 4] = 0;
+        genome[P + 5] = 40; genome[P + 6] = 0;
+        genome[P + 7] = OP_HALT;
+
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
+
+        REQUIRE(plant.brain().is_halted());
+        REQUIRE(plant.brain().ip() == P + 8);
+    }
+
+    SECTION("JUMP_LT jumps when a < b") {
+        std::vector<uint8_t> genome(50, OP_NOP);
+        genome[30] = 3;
+        genome[31] = 10;
+        genome[P]     = OP_JUMP_LT;
+        genome[P + 1] = 30; genome[P + 2] = 0;
+        genome[P + 3] = 31; genome[P + 4] = 0;
+        genome[P + 5] = 40; genome[P + 6] = 0;
+        genome[40] = OP_HALT;
+
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
+
+        REQUIRE(plant.brain().is_halted());
+        REQUIRE(plant.brain().ip() == 41);
+    }
+
+    SECTION("JUMP_LT does not jump when a >= b") {
+        std::vector<uint8_t> genome(50, OP_NOP);
+        genome[30] = 10;
+        genome[31] = 10;
+        genome[P]     = OP_JUMP_LT;
+        genome[P + 1] = 30; genome[P + 2] = 0;
+        genome[P + 3] = 31; genome[P + 4] = 0;
+        genome[P + 5] = 40; genome[P + 6] = 0;
+        genome[P + 7] = OP_HALT;
+
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
+
+        REQUIRE(plant.brain().is_halted());
+        REQUIRE(plant.brain().ip() == P + 8);
+    }
+}

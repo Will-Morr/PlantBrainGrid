@@ -201,7 +201,7 @@ TEST_CASE("Haustorium cell", "[simulation][haustorium]") {
 
     SECTION("Haustorium costs and maintenance") {
         REQUIRE(cfg.haustorium_costs.build_energy == 10.0f);
-        REQUIRE(cfg.haustorium_costs.maintain_energy == 0.05f);
+        REQUIRE(cfg.haustorium_costs.maintain_energy == 0.1f);
     }
 
     SECTION("Haustorium steals correct amount") {
