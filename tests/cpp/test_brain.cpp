@@ -7,6 +7,9 @@
 
 using namespace pbg;
 
+// Program start offset (first 8 bytes are registers)
+static constexpr int P = NUM_REGISTERS;
+
 // Helper to create a plant for testing
 static Plant make_test_plant(const std::vector<uint8_t>& genome) {
     Plant plant(1, {50, 50}, genome);
@@ -40,6 +43,11 @@ TEST_CASE("Brain construction", "[brain]") {
             REQUIRE(brain.read(i) == 0);
         }
     }
+
+    SECTION("IP starts at NUM_REGISTERS") {
+        Brain brain(256);
+        REQUIRE(brain.ip() == NUM_REGISTERS);
+    }
 }
 
 TEST_CASE("Brain memory operations", "[brain]") {
@@ -65,42 +73,47 @@ TEST_CASE("Brain control flow instructions", "[brain]") {
     World world(100, 100, 42);
 
     SECTION("NOP advances IP") {
-        std::vector<uint8_t> genome = {OP_NOP, OP_NOP, OP_HALT};
-        auto plant = make_test_plant(genome);
+        std::vector<uint8_t> genome(P + 3, 0);
+        genome[P]     = OP_NOP;
+        genome[P + 1] = OP_NOP;
+        genome[P + 2] = OP_HALT;
 
+        auto plant = make_test_plant(genome);
         plant.brain().execute_tick(plant, world, test_rng);
-        // Should have executed all 3 instructions
         REQUIRE(plant.brain().is_halted());
     }
 
     SECTION("HALT stops execution") {
-        std::vector<uint8_t> genome = {OP_HALT, OP_NOP, OP_NOP};
-        auto plant = make_test_plant(genome);
+        std::vector<uint8_t> genome(P + 3, 0);
+        genome[P]     = OP_HALT;
+        genome[P + 1] = OP_NOP;
+        genome[P + 2] = OP_NOP;
 
-        auto actions = plant.brain().execute_tick(plant, world, test_rng);
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
         REQUIRE(plant.brain().is_halted());
-        REQUIRE(plant.brain().ip() == 1);  // Stopped after HALT
+        REQUIRE(plant.brain().ip() == P + 1);
     }
 
     SECTION("JUMP goes to address") {
-        std::vector<uint8_t> genome(20, OP_NOP);
-        genome[0] = OP_JUMP;
-        genome[1] = 10;  // Low byte of address
-        genome[2] = 0;   // High byte of address
-        genome[10] = OP_HALT;
+        std::vector<uint8_t> genome(30, OP_NOP);
+        genome[P]     = OP_JUMP;
+        genome[P + 1] = 20;  // Low byte of address
+        genome[P + 2] = 0;   // High byte of address
+        genome[20]    = OP_HALT;
 
         auto plant = make_test_plant(genome);
         plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().is_halted());
-        REQUIRE(plant.brain().ip() == 11);
+        REQUIRE(plant.brain().ip() == 21);
     }
 
     SECTION("JUMP_REL with positive offset") {
-        std::vector<uint8_t> genome(20, OP_NOP);
-        genome[0] = OP_JUMP_REL;
-        genome[1] = 5;  // Jump forward 5
-        genome[7] = OP_HALT;
+        std::vector<uint8_t> genome(30, OP_NOP);
+        genome[P]     = OP_JUMP_REL;
+        genome[P + 1] = 5;  // Jump forward 5 from ip=(P+2) → target=P+7
+        genome[P + 7] = OP_HALT;
 
         auto plant = make_test_plant(genome);
         plant.brain().execute_tick(plant, world, test_rng);
@@ -109,52 +122,52 @@ TEST_CASE("Brain control flow instructions", "[brain]") {
     }
 
     SECTION("JUMP_IF_ZERO jumps when zero") {
-        std::vector<uint8_t> genome(30, OP_NOP);
-        // mem[20] = 0 (default), so should jump
-        genome[0] = OP_JUMP_IF_ZERO;
-        genome[1] = 20;  // Test address low
-        genome[2] = 0;   // Test address high
-        genome[3] = 15;  // Jump address low
-        genome[4] = 0;   // Jump address high
-        genome[15] = OP_HALT;
+        std::vector<uint8_t> genome(40, OP_NOP);
+        // mem[30] = 0 (default), so should jump
+        genome[P]     = OP_JUMP_IF_ZERO;
+        genome[P + 1] = 30;  // Test address low
+        genome[P + 2] = 0;   // Test address high
+        genome[P + 3] = 25;  // Jump address low
+        genome[P + 4] = 0;   // Jump address high
+        genome[25]    = OP_HALT;
 
         auto plant = make_test_plant(genome);
         plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().is_halted());
-        REQUIRE(plant.brain().ip() == 16);
+        REQUIRE(plant.brain().ip() == 26);
     }
 
     SECTION("JUMP_IF_ZERO does not jump when non-zero") {
-        std::vector<uint8_t> genome(30, OP_NOP);
-        genome[20] = 1;  // Non-zero value
-        genome[0] = OP_JUMP_IF_ZERO;
-        genome[1] = 20;
-        genome[2] = 0;
-        genome[3] = 15;
-        genome[4] = 0;
-        genome[5] = OP_HALT;
+        std::vector<uint8_t> genome(40, OP_NOP);
+        genome[30]    = 1;  // Non-zero value
+        genome[P]     = OP_JUMP_IF_ZERO;
+        genome[P + 1] = 30;
+        genome[P + 2] = 0;
+        genome[P + 3] = 25;
+        genome[P + 4] = 0;
+        genome[P + 5] = OP_HALT;
 
         auto plant = make_test_plant(genome);
         plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().is_halted());
-        REQUIRE(plant.brain().ip() == 6);  // Continued past jump
+        REQUIRE(plant.brain().ip() == P + 6);
     }
 
     SECTION("CALL and RET") {
         std::vector<uint8_t> genome(30, OP_NOP);
-        genome[0] = OP_CALL;
-        genome[1] = 10;  // Call address
-        genome[2] = 0;
-        genome[3] = OP_HALT;  // Return here
-        genome[10] = OP_RET;
+        genome[P]     = OP_CALL;
+        genome[P + 1] = 20;  // Call address
+        genome[P + 2] = 0;
+        genome[P + 3] = OP_HALT;  // Return here
+        genome[20]    = OP_RET;
 
         auto plant = make_test_plant(genome);
         plant.brain().execute_tick(plant, world, test_rng);
 
         REQUIRE(plant.brain().is_halted());
-        REQUIRE(plant.brain().ip() == 4);  // After HALT following return
+        REQUIRE(plant.brain().ip() == P + 4);
     }
 }
 
@@ -163,31 +176,28 @@ TEST_CASE("Brain arithmetic instructions", "[brain]") {
 
     SECTION("LOAD_IMM stores value") {
         std::vector<uint8_t> genome(50, 0);
-        genome[0] = OP_LOAD_IMM;
-        genome[1] = 20;  // Address low
-        genome[2] = 0;   // Address high
-        genome[3] = 42;  // Value
-        genome[4] = OP_HALT;
+        genome[P]     = OP_LOAD_IMM;
+        genome[P + 1] = 30;  // Address low
+        genome[P + 2] = 0;   // Address high
+        genome[P + 3] = 42;  // Value
+        genome[P + 4] = OP_HALT;
 
         auto plant = make_test_plant(genome);
         plant.brain().execute_tick(plant, world, test_rng);
 
-        REQUIRE(plant.brain().read(20) == 42);
+        REQUIRE(plant.brain().read(30) == 42);
     }
 
     SECTION("ADD") {
         std::vector<uint8_t> genome(50, 0);
-        genome[30] = 10;  // First operand
-        genome[32] = 5;   // Second operand
+        genome[35] = 10;  // First operand
+        genome[37] = 5;   // Second operand
 
-        genome[0] = OP_ADD;
-        genome[1] = 40;  // Dest low
-        genome[2] = 0;
-        genome[3] = 30;  // A low
-        genome[4] = 0;
-        genome[5] = 32;  // B low
-        genome[6] = 0;
-        genome[7] = OP_HALT;
+        genome[P]     = OP_ADD;
+        genome[P + 1] = 40; genome[P + 2] = 0;   // Dest
+        genome[P + 3] = 35; genome[P + 4] = 0;   // A
+        genome[P + 5] = 37; genome[P + 6] = 0;   // B
+        genome[P + 7] = OP_HALT;
 
         auto plant = make_test_plant(genome);
         plant.brain().execute_tick(plant, world, test_rng);
@@ -197,14 +207,14 @@ TEST_CASE("Brain arithmetic instructions", "[brain]") {
 
     SECTION("SUB") {
         std::vector<uint8_t> genome(50, 0);
-        genome[30] = 20;
-        genome[32] = 8;
+        genome[35] = 20;
+        genome[37] = 8;
 
-        genome[0] = OP_SUB;
-        genome[1] = 40; genome[2] = 0;  // dest
-        genome[3] = 30; genome[4] = 0;  // a
-        genome[5] = 32; genome[6] = 0;  // b
-        genome[7] = OP_HALT;
+        genome[P]     = OP_SUB;
+        genome[P + 1] = 40; genome[P + 2] = 0;
+        genome[P + 3] = 35; genome[P + 4] = 0;
+        genome[P + 5] = 37; genome[P + 6] = 0;
+        genome[P + 7] = OP_HALT;
 
         auto plant = make_test_plant(genome);
         plant.brain().execute_tick(plant, world, test_rng);
@@ -214,14 +224,14 @@ TEST_CASE("Brain arithmetic instructions", "[brain]") {
 
     SECTION("DIV by zero returns zero") {
         std::vector<uint8_t> genome(50, 0);
-        genome[30] = 100;
-        genome[32] = 0;  // Divisor is zero
+        genome[35] = 100;
+        genome[37] = 0;
 
-        genome[0] = OP_DIV;
-        genome[1] = 40; genome[2] = 0;
-        genome[3] = 30; genome[4] = 0;
-        genome[5] = 32; genome[6] = 0;
-        genome[7] = OP_HALT;
+        genome[P]     = OP_DIV;
+        genome[P + 1] = 40; genome[P + 2] = 0;
+        genome[P + 3] = 35; genome[P + 4] = 0;
+        genome[P + 5] = 37; genome[P + 6] = 0;
+        genome[P + 7] = OP_HALT;
 
         auto plant = make_test_plant(genome);
         plant.brain().execute_tick(plant, world, test_rng);
@@ -231,14 +241,14 @@ TEST_CASE("Brain arithmetic instructions", "[brain]") {
 
     SECTION("CMP_LT") {
         std::vector<uint8_t> genome(50, 0);
-        genome[30] = 5;
-        genome[32] = 10;
+        genome[35] = 5;
+        genome[37] = 10;
 
-        genome[0] = OP_CMP_LT;
-        genome[1] = 40; genome[2] = 0;
-        genome[3] = 30; genome[4] = 0;  // 5
-        genome[5] = 32; genome[6] = 0;  // 10
-        genome[7] = OP_HALT;
+        genome[P]     = OP_CMP_LT;
+        genome[P + 1] = 40; genome[P + 2] = 0;
+        genome[P + 3] = 35; genome[P + 4] = 0;
+        genome[P + 5] = 37; genome[P + 6] = 0;
+        genome[P + 7] = OP_HALT;
 
         auto plant = make_test_plant(genome);
         plant.brain().execute_tick(plant, world, test_rng);
@@ -252,32 +262,30 @@ TEST_CASE("Brain sensing instructions", "[brain]") {
 
     SECTION("SENSE_SELF_ENERGY") {
         std::vector<uint8_t> genome(50, 0);
-        genome[0] = OP_SENSE_SELF_ENERGY;
-        genome[1] = 20; genome[2] = 0;  // Dest
-        genome[3] = OP_HALT;
+        genome[P]     = OP_SENSE_SELF_ENERGY;
+        genome[P + 1] = 30; genome[P + 2] = 0;
+        genome[P + 3] = OP_HALT;
 
         auto plant = make_test_plant(genome);
         plant.resources().energy = 5.0f;
 
         plant.brain().execute_tick(plant, world, test_rng);
 
-        // 5.0 * resource_sense_scale, clamped to 255
         uint8_t expected = static_cast<uint8_t>(std::min(255.0f, 5.0f * get_config().resource_sense_scale));
-        REQUIRE(plant.brain().read(20) == expected);
+        REQUIRE(plant.brain().read(30) == expected);
     }
 
     SECTION("SENSE_CELL_COUNT") {
         std::vector<uint8_t> genome(50, 0);
-        genome[0] = OP_SENSE_CELL_COUNT;
-        genome[1] = 20; genome[2] = 0;
-        genome[3] = OP_HALT;
+        genome[P]     = OP_SENSE_CELL_COUNT;
+        genome[P + 1] = 30; genome[P + 2] = 0;
+        genome[P + 3] = OP_HALT;
 
         auto plant = make_test_plant(genome);
-        // Plant starts with 1 cell (primary)
 
         plant.brain().execute_tick(plant, world, test_rng);
 
-        REQUIRE(plant.brain().read(20) == 1);
+        REQUIRE(plant.brain().read(30) == 1);
     }
 }
 
@@ -286,11 +294,11 @@ TEST_CASE("Brain action queueing", "[brain]") {
 
     SECTION("PLACE_CELL queues action") {
         std::vector<uint8_t> genome(50, 0);
-        genome[0] = OP_PLACE_CELL;
-        genome[1] = static_cast<uint8_t>(CellType::SmallLeaf);
-        genome[2] = 1;   // dx
-        genome[3] = 0;   // dy
-        genome[4] = OP_HALT;
+        genome[P]     = OP_PLACE_CELL;
+        genome[P + 1] = static_cast<uint8_t>(CellType::SmallLeaf);
+        genome[P + 2] = 1;   // dx
+        genome[P + 3] = 0;   // dy
+        genome[P + 4] = OP_HALT;
 
         auto plant = make_test_plant(genome);
         auto actions = plant.brain().execute_tick(plant, world, test_rng);
@@ -303,16 +311,16 @@ TEST_CASE("Brain action queueing", "[brain]") {
 
     SECTION("LAUNCH_SEED queues action with params") {
         std::vector<uint8_t> genome(50, 0);
-        genome[0] = OP_LAUNCH_SEED;
-        genome[1] = 0;   // recomb method
-        genome[2] = 100; // energy
-        genome[3] = 50;  // water
-        genome[4] = 25;  // nutrients
-        genome[5] = 10;  // power
-        genome[6] = 5;   // dx
-        genome[7] = static_cast<uint8_t>(-3);  // dy (signed)
-        genome[8] = 1;   // placement mode (random)
-        genome[9] = OP_HALT;
+        genome[P]     = OP_LAUNCH_SEED;
+        genome[P + 1] = 0;   // recomb method
+        genome[P + 2] = 100; // energy
+        genome[P + 3] = 50;  // water
+        genome[P + 4] = 25;  // nutrients
+        genome[P + 5] = 10;  // power
+        genome[P + 6] = 5;   // dx
+        genome[P + 7] = static_cast<uint8_t>(-3);  // dy (signed)
+        genome[P + 8] = 1;   // placement mode (random)
+        genome[P + 9] = OP_HALT;
 
         auto plant = make_test_plant(genome);
         auto actions = plant.brain().execute_tick(plant, world, test_rng);
@@ -337,9 +345,9 @@ TEST_CASE("Brain error penalties", "[brain]") {
     SECTION("Instruction limit penalty") {
         // Create infinite loop
         std::vector<uint8_t> genome(50, 0);
-        genome[0] = OP_JUMP;
-        genome[1] = 0;
-        genome[2] = 0;  // Jump to 0 forever
+        genome[P]     = OP_JUMP;
+        genome[P + 1] = P;   // Jump back to P forever
+        genome[P + 2] = 0;
 
         auto plant = make_test_plant(genome);
         float initial_energy = plant.resources().energy;
@@ -357,22 +365,20 @@ TEST_CASE("Brain randomize instruction", "[brain]") {
 
     SECTION("RANDOMIZE modifies memory range") {
         std::vector<uint8_t> genome(100, 0);
-        genome[0] = OP_RANDOMIZE;
-        genome[1] = 50;  // Start address low
-        genome[2] = 0;   // Start address high
-        genome[3] = 10;  // Length
-        genome[4] = OP_HALT;
+        genome[P]     = OP_RANDOMIZE;
+        genome[P + 1] = 50;  // Start address low
+        genome[P + 2] = 0;   // Start address high
+        genome[P + 3] = 10;  // Length
+        genome[P + 4] = OP_HALT;
 
         auto plant = make_test_plant(genome);
 
-        // Verify initially zero
         for (int i = 50; i < 60; ++i) {
             REQUIRE(plant.brain().read(i) == 0);
         }
 
         plant.brain().execute_tick(plant, world, test_rng);
 
-        // At least some values should have changed
         int changed = 0;
         for (int i = 50; i < 60; ++i) {
             if (plant.brain().read(i) != 0) {
@@ -397,5 +403,106 @@ TEST_CASE("Brain stack operations", "[brain]") {
     SECTION("Pop empty stack returns 0") {
         REQUIRE(brain.stack_empty());
         REQUIRE(brain.pop_stack() == 0);
+    }
+}
+
+TEST_CASE("Brain register addressing", "[brain]") {
+    World world(100, 100, 42);
+
+    SECTION("MSB clear — normal address") {
+        // LOAD_IMM to address 30 (MSB clear) should work normally
+        std::vector<uint8_t> genome(50, 0);
+        genome[P]     = OP_LOAD_IMM;
+        genome[P + 1] = 30;  // addr low  (0x001E — MSB clear)
+        genome[P + 2] = 0;   // addr high
+        genome[P + 3] = 99;  // value
+        genome[P + 4] = OP_HALT;
+
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
+
+        REQUIRE(plant.brain().read(30) == 99);
+    }
+
+    SECTION("MSB set, second bit clear — register via modulo") {
+        // Address with MSB set and bit 14 clear → register = addr % 8
+        // 0x8003 = 1000 0000 0000 0011 → MSB=1, bit14=0, addr%8 = 3 → register 3
+        std::vector<uint8_t> genome(50, 0);
+        genome[3] = 0;  // Register 3 starts at 0
+        genome[P]     = OP_LOAD_IMM;
+        genome[P + 1] = 0x03;  // addr low byte
+        genome[P + 2] = 0x80;  // addr high byte (MSB set, bit14 clear)
+        genome[P + 3] = 77;    // value to store
+        genome[P + 4] = OP_HALT;
+
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
+
+        // Should have written to register 3 (memory address 3)
+        REQUIRE(plant.brain().read(3) == 77);
+    }
+
+    SECTION("MSB set, second bit set — last referenced register") {
+        // First: write to register 5 via modulo (0x8005 → reg 5)
+        // Then:  write via last-register mode (0xC000 → bit14 set → last reg = 5)
+        std::vector<uint8_t> genome(50, 0);
+
+        // LOAD_IMM to register 5 via modulo addressing
+        genome[P]     = OP_LOAD_IMM;
+        genome[P + 1] = 0x05;  // addr low
+        genome[P + 2] = 0x80;  // addr high (MSB=1, bit14=0) → reg 5
+        genome[P + 3] = 42;    // value
+
+        // LOAD_IMM via last-referenced register (should hit reg 5 again)
+        genome[P + 4] = OP_LOAD_IMM;
+        genome[P + 5] = 0x00;  // addr low  (doesn't matter for last-reg mode)
+        genome[P + 6] = 0xC0;  // addr high (MSB=1, bit14=1) → last register
+        genome[P + 7] = 99;    // overwrite with 99
+
+        genome[P + 8] = OP_HALT;
+
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
+
+        // Register 5 should now contain 99 (overwritten by second LOAD_IMM)
+        REQUIRE(plant.brain().read(5) == 99);
+    }
+
+    SECTION("Register read via safe_read") {
+        // Store a value in register 2, then use ADD to read it
+        std::vector<uint8_t> genome(50, 0);
+        genome[2] = 10;   // Register 2 = 10
+        genome[40] = 5;   // Normal memory at 40 = 5
+
+        // ADD dest=45 a=reg2(0x8002) b=addr40
+        genome[P]      = OP_ADD;
+        genome[P + 1]  = 45; genome[P + 2] = 0;     // dest (normal)
+        genome[P + 3]  = 0x02; genome[P + 4] = 0x80; // a = register 2
+        genome[P + 5]  = 40; genome[P + 6] = 0;      // b = normal addr 40
+        genome[P + 7]  = OP_HALT;
+
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
+
+        REQUIRE(plant.brain().read(45) == 15);  // 10 + 5
+    }
+
+    SECTION("Last register defaults to 0") {
+        // Without any prior register access, last_register_ = 0
+        // Using last-register mode should access register 0
+        std::vector<uint8_t> genome(50, 0);
+        genome[0] = 123;  // Register 0 = 123
+
+        // LOAD_IMM: read dest via last-register mode
+        // Actually LOAD_IMM writes — let's use COPY to read reg 0 → addr 40
+        genome[P]     = OP_COPY;
+        genome[P + 1] = 40; genome[P + 2] = 0;     // dest = normal addr 40
+        genome[P + 3] = 0x00; genome[P + 4] = 0xC0; // src = last register (0)
+        genome[P + 5] = OP_HALT;
+
+        auto plant = make_test_plant(genome);
+        plant.brain().execute_tick(plant, world, test_rng);
+
+        REQUIRE(plant.brain().read(40) == 123);
     }
 }

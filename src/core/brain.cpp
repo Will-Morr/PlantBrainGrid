@@ -43,6 +43,26 @@ void Brain::randomize_range(uint16_t start, uint16_t length, std::mt19937_64& rn
     }
 }
 
+uint16_t Brain::resolve_address(uint16_t addr) {
+    constexpr uint16_t MSB_MASK = 0x8000;        // bit 15
+    constexpr uint16_t SECOND_BIT_MASK = 0x4000;  // bit 14
+
+    if (!(addr & MSB_MASK)) {
+        // MSB not set — treat as normal address
+        return addr;
+    }
+
+    if (!(addr & SECOND_BIT_MASK)) {
+        // MSB set, second bit clear — modulo with 8 to pick a register
+        uint8_t reg_idx = static_cast<uint8_t>(addr % NUM_REGISTERS);
+        last_register_ = reg_idx;
+        return reg_idx;
+    } else {
+        // MSB set, second bit set — use the most recently referenced register
+        return last_register_;
+    }
+}
+
 void Brain::push_stack(uint16_t addr) {
     call_stack_.push_back(addr);
 }
@@ -138,7 +158,9 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
     }
 
     // Helper to check memory bounds and track OOB
+    // Resolves register addressing before access.
     auto safe_read = [this](uint16_t addr) -> uint8_t {
+        addr = resolve_address(addr);
         if (addr >= memory_.size()) {
             ++oob_count_;
             return 0;
@@ -147,6 +169,7 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
     };
 
     auto safe_write = [this](uint16_t addr, uint8_t val) {
+        addr = resolve_address(addr);
         if (addr >= memory_.size()) {
             ++oob_count_;
             return;

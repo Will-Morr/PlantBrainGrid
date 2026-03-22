@@ -14,29 +14,32 @@ using Catch::Matchers::WithinAbs;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
+// Program starts at offset NUM_REGISTERS (first 8 bytes are registers)
+static constexpr int P = NUM_REGISTERS;
+
 static std::vector<uint8_t> make_halt_genome(size_t size = 256) {
     std::vector<uint8_t> g(size, 0);
-    g[0] = OP_HALT;
+    g[P] = OP_HALT;
     return g;
 }
 
 // Genome that loops forever (hits instruction limit every tick)
 static std::vector<uint8_t> make_looping_genome(size_t size = 256) {
     std::vector<uint8_t> g(size, 0);
-    // JUMP 0x0000 — loops back to itself
-    g[0] = OP_JUMP;
-    g[1] = 0; g[2] = 0;
+    // JUMP back to P — loops back to itself
+    g[P] = OP_JUMP;
+    g[P + 1] = P; g[P + 2] = 0;
     return g;
 }
 
 // Genome that tries to place a SmallLeaf at (+1, 0)
 static std::vector<uint8_t> make_placer_genome(size_t size = 256) {
     std::vector<uint8_t> g(size, 0);
-    g[0] = OP_PLACE_CELL;
-    g[1] = static_cast<uint8_t>(CellType::SmallLeaf);
-    g[2] = 1;   // dx = +1
-    g[3] = 0;   // dy = 0
-    g[4] = OP_HALT;
+    g[P] = OP_PLACE_CELL;
+    g[P + 1] = static_cast<uint8_t>(CellType::SmallLeaf);
+    g[P + 2] = 1;   // dx = +1
+    g[P + 3] = 0;   // dy = 0
+    g[P + 4] = OP_HALT;
     return g;
 }
 
@@ -119,13 +122,13 @@ TEST_CASE("Parallel brain thread safety", "[parallel][simulation]") {
         // Check that each brain's memory reflects only its own execution.
         std::vector<uint8_t> genome_a(256, 0);
         // Plant A: writes 0xAA to addr 100
-        genome_a[0] = OP_LOAD_IMM; genome_a[1] = 100; genome_a[2] = 0; genome_a[3] = 0xAA;
-        genome_a[4] = OP_HALT;
+        genome_a[P] = OP_LOAD_IMM; genome_a[P+1] = 100; genome_a[P+2] = 0; genome_a[P+3] = 0xAA;
+        genome_a[P+4] = OP_HALT;
 
         std::vector<uint8_t> genome_b(256, 0);
         // Plant B: writes 0x55 to addr 100
-        genome_b[0] = OP_LOAD_IMM; genome_b[1] = 100; genome_b[2] = 0; genome_b[3] = 0x55;
-        genome_b[4] = OP_HALT;
+        genome_b[P] = OP_LOAD_IMM; genome_b[P+1] = 100; genome_b[P+2] = 0; genome_b[P+3] = 0x55;
+        genome_b[P+4] = OP_HALT;
 
         Simulation sim(50, 50, 1);
         uint64_t id_a = 0, id_b = 0;
@@ -160,10 +163,10 @@ TEST_CASE("Parallel brain thread safety", "[parallel][simulation]") {
         std::vector<std::vector<uint8_t>> genomes(N);
         for (int i = 0; i < N; ++i) {
             genomes[i].assign(256, 0);
-            genomes[i][0] = OP_LOAD_IMM;
-            genomes[i][1] = 200; genomes[i][2] = 0;
-            genomes[i][3] = static_cast<uint8_t>(i + 1);  // unique marker 1..N
-            genomes[i][4] = OP_HALT;
+            genomes[i][P] = OP_LOAD_IMM;
+            genomes[i][P+1] = 200; genomes[i][P+2] = 0;
+            genomes[i][P+3] = static_cast<uint8_t>(i + 1);  // unique marker 1..N
+            genomes[i][P+4] = OP_HALT;
         }
 
         Simulation sim(200, 200, 7);
@@ -251,11 +254,11 @@ TEST_CASE("Resource edge cases", "[parallel][resources]") {
         std::vector<uint8_t> genome(256, 0);
         // SENSE_WATER at a world position using OOB dest address
         // Actually use LOAD_IND with an address pointing beyond memory
-        // Simpler: write to addr 65535 (definitely OOB for 1024-byte brain)
-        genome[0] = OP_LOAD_IMM;
-        genome[1] = 0xFF; genome[2] = 0xFF;  // addr 65535 — OOB
-        genome[3] = 42;
-        genome[4] = OP_HALT;
+        // Simpler: write to addr 0x7FFF (definitely OOB, MSB clear so no register redirect)
+        genome[P] = OP_LOAD_IMM;
+        genome[P+1] = 0xFF; genome[P+2] = 0x7F;  // addr 32767 — OOB
+        genome[P+3] = 42;
+        genome[P+4] = OP_HALT;
 
         const auto& cfg = get_config();
         Simulation sim(50, 50, 42);
@@ -279,16 +282,16 @@ TEST_CASE("Parallel placement conflict resolution", "[parallel][simulation]") {
         // Plant B at (30, 25) tries to place at (21, 25)... but that's too far.
         // Instead: A at (20,25) → target (21,25), B at (22,25) → target (21,25)
         std::vector<uint8_t> genome_a(256, 0);
-        genome_a[0] = OP_PLACE_CELL;
-        genome_a[1] = static_cast<uint8_t>(CellType::SmallLeaf);
-        genome_a[2] = 1;   // dx = +1 → (21, 25)
-        genome_a[3] = 0; genome_a[4] = 0; genome_a[5] = OP_HALT;
+        genome_a[P] = OP_PLACE_CELL;
+        genome_a[P+1] = static_cast<uint8_t>(CellType::SmallLeaf);
+        genome_a[P+2] = 1;   // dx = +1 → (21, 25)
+        genome_a[P+3] = 0; genome_a[P+4] = 0; genome_a[P+5] = OP_HALT;
 
         std::vector<uint8_t> genome_b(256, 0);
-        genome_b[0] = OP_PLACE_CELL;
-        genome_b[1] = static_cast<uint8_t>(CellType::SmallLeaf);
-        genome_b[2] = static_cast<uint8_t>(-1);  // dx = -1 → (21, 25)
-        genome_b[3] = 0; genome_b[4] = 0; genome_b[5] = OP_HALT;
+        genome_b[P] = OP_PLACE_CELL;
+        genome_b[P+1] = static_cast<uint8_t>(CellType::SmallLeaf);
+        genome_b[P+2] = static_cast<uint8_t>(-1);  // dx = -1 → (21, 25)
+        genome_b[P+3] = 0; genome_b[P+4] = 0; genome_b[P+5] = OP_HALT;
 
         Simulation sim(50, 50, 42);
         uint64_t id_a, id_b;
@@ -324,14 +327,14 @@ TEST_CASE("Parallel placement conflict resolution", "[parallel][simulation]") {
     SECTION("Same plant placing cell twice doesn't double-charge") {
         // A genome that queues two PlaceCell actions to the same position
         std::vector<uint8_t> genome(256, 0);
-        genome[0] = OP_PLACE_CELL;
-        genome[1] = static_cast<uint8_t>(CellType::SmallLeaf);
-        genome[2] = 1; genome[3] = 0; genome[4] = 0;  // (+1, 0)
+        genome[P] = OP_PLACE_CELL;
+        genome[P+1] = static_cast<uint8_t>(CellType::SmallLeaf);
+        genome[P+2] = 1; genome[P+3] = 0; genome[P+4] = 0;  // (+1, 0)
         // Second placement to same position
-        genome[5] = OP_PLACE_CELL;
-        genome[6] = static_cast<uint8_t>(CellType::SmallLeaf);
-        genome[7] = 1; genome[8] = 0; genome[9] = 0;
-        genome[10] = OP_HALT;
+        genome[P+5] = OP_PLACE_CELL;
+        genome[P+6] = static_cast<uint8_t>(CellType::SmallLeaf);
+        genome[P+7] = 1; genome[P+8] = 0; genome[P+9] = 0;
+        genome[P+10] = OP_HALT;
 
         const auto& cfg = get_config();
         Simulation sim(50, 50, 42);

@@ -1,10 +1,15 @@
 #include <catch2/catch_test_macros.hpp>
 #include "core/simulation.hpp"
+#include "core/brain.hpp"
+#include "core/brain_ops.hpp"
 #include "core/config.hpp"
 #include <fstream>
 #include <vector>
 
 using namespace pbg;
+
+// Program starts at offset NUM_REGISTERS (first 8 bytes are registers)
+static constexpr int P = NUM_REGISTERS;
 
 TEST_CASE("Simulation construction", "[simulation]") {
     Simulation sim(100, 100, 42);
@@ -459,11 +464,11 @@ TEST_CASE("Starvation death", "[simulation]") {
 
     SECTION("Negative resources from placement cost kill the plant") {
         // Brain places a cell costing 10 energy; plant only has 5 — goes negative.
-        // OP_PLACE_CELL=0x60, SmallLeaf=2, dx=+1, dy=0, dir=0, HALT=0x01
+        // OP_PLACE_CELL=0x60, SmallLeaf=2, dx=+1, dy=0, HALT=0x01
         std::vector<uint8_t> placer(1024, 0);
-        placer[0] = 0x60; placer[1] = 0x02;
-        placer[2] = 0x01; placer[3] = 0x00;
-        placer[4] = 0x00; placer[5] = 0x01;
+        placer[P] = 0x60; placer[P+1] = 0x02;
+        placer[P+2] = 0x01; placer[P+3] = 0x00;
+        placer[P+4] = 0x01;
 
         Simulation sim(100, 100, 42);
         Plant* plant = sim.add_plant({50, 50}, placer);
@@ -496,9 +501,9 @@ TEST_CASE("Starvation death", "[simulation]") {
         // Brain places Bark (build costs 1 water + 1 nutrient); plant has 0 nutrients.
         // OP_PLACE_CELL=0x60, Bark=6, dx=+1, dy=0, HALT=0x01
         std::vector<uint8_t> bark_placer(1024, 0);
-        bark_placer[0] = 0x60; bark_placer[1] = 0x06;  // OP_PLACE_CELL, Bark
-        bark_placer[2] = 0x01; bark_placer[3] = 0x00;  // dx=+1, dy=0
-        bark_placer[4] = 0x01;                          // OP_HALT
+        bark_placer[P] = 0x60; bark_placer[P+1] = 0x06;  // OP_PLACE_CELL, Bark
+        bark_placer[P+2] = 0x01; bark_placer[P+3] = 0x00;  // dx=+1, dy=0
+        bark_placer[P+4] = 0x01;                            // OP_HALT
 
         Simulation sim(100, 100, 42);
         Plant* plant = sim.add_plant({50, 50}, bark_placer);
@@ -648,16 +653,15 @@ TEST_CASE("Old age death", "[simulation]") {
 
 TEST_CASE("Cell overlap prevention", "[simulation]") {
     // Brain genome that places SmallLeaf(2) at dx=+1, dy=0 then halts.
-    // OP_PLACE_CELL=0x60, type=2, dx=+1, dy=0, dir=0, OP_HALT=0x01
     std::vector<uint8_t> placer_genome(1024, 0);
-    placer_genome[0] = 0x60; // OP_PLACE_CELL
-    placer_genome[1] = 0x02; // SmallLeaf
-    placer_genome[2] = 0x01; // dx=+1
-    placer_genome[3] = 0x00; // dy=0
-    placer_genome[4] = 0x01; // OP_HALT
+    placer_genome[P] = 0x60; // OP_PLACE_CELL
+    placer_genome[P+1] = 0x02; // SmallLeaf
+    placer_genome[P+2] = 0x01; // dx=+1
+    placer_genome[P+3] = 0x00; // dy=0
+    placer_genome[P+4] = 0x01; // OP_HALT
 
     std::vector<uint8_t> idle_genome(1024, 0); // all NOPs, effectively idle
-    idle_genome[0] = 0x01; // OP_HALT immediately
+    idle_genome[P] = 0x01; // OP_HALT immediately
 
     SECTION("Placing on another plant's cell displaces it") {
         // Plant A at (50,50) wants to place at (51,50).
@@ -758,9 +762,9 @@ TEST_CASE("Cell overlap prevention", "[simulation]") {
         // Both plants try to place at the same empty tile; conflict cancels both.
         // Genome: PLACE_CELL SmallLeaf dx=0 dy=+1 (above primary)
         std::vector<uint8_t> up_genome(1024, 0);
-        up_genome[0] = 0x60; up_genome[1] = 0x02; // OP_PLACE_CELL, SmallLeaf
-        up_genome[2] = 0x00; up_genome[3] = 0x01; // dx=0, dy=+1
-        up_genome[4] = 0x00; up_genome[5] = 0x01; // dir=North, OP_HALT
+        up_genome[P] = 0x60; up_genome[P+1] = 0x02; // OP_PLACE_CELL, SmallLeaf
+        up_genome[P+2] = 0x00; up_genome[P+3] = 0x01; // dx=0, dy=+1
+        up_genome[P+4] = 0x01; // OP_HALT
 
         Simulation sim(100, 100, 42);
         // Plants on either side of the empty target at (51,50)
@@ -778,16 +782,15 @@ TEST_CASE("Cell overlap prevention", "[simulation]") {
         // Actually: simulate conflict by giving both a brain placing at same tile.
         // B's idle_genome doesn't place — let's give B the placer that places at dx=-1
         std::vector<uint8_t> left_placer(1024, 0);
-        left_placer[0] = 0x60; left_placer[1] = 0x02;
-        left_placer[2] = static_cast<uint8_t>(-1); // dx=-1 as int8
-        left_placer[3] = 0x00; left_placer[4] = 0x00; left_placer[5] = 0x01;
+        left_placer[P] = 0x60; left_placer[P+1] = 0x02;
+        left_placer[P+2] = static_cast<uint8_t>(-1); // dx=-1 as int8
+        left_placer[P+3] = 0x00; left_placer[P+4] = 0x01;
 
-        sim.find_plant(2)->brain().write(0, 0x60); // PLACE_CELL
-        sim.find_plant(2)->brain().write(1, 0x02); // SmallLeaf
-        sim.find_plant(2)->brain().write(2, static_cast<uint8_t>(-1)); // dx=-1
-        sim.find_plant(2)->brain().write(3, 0x00);
-        sim.find_plant(2)->brain().write(4, 0x00);
-        sim.find_plant(2)->brain().write(5, 0x01); // HALT
+        sim.find_plant(2)->brain().write(P, 0x60); // PLACE_CELL
+        sim.find_plant(2)->brain().write(P+1, 0x02); // SmallLeaf
+        sim.find_plant(2)->brain().write(P+2, static_cast<uint8_t>(-1)); // dx=-1
+        sim.find_plant(2)->brain().write(P+3, 0x00);
+        sim.find_plant(2)->brain().write(P+4, 0x01); // HALT
 
         float a_energy_before = a->resources().energy;
         float b_energy_before = b->resources().energy;

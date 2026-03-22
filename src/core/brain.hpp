@@ -69,6 +69,10 @@ struct MateSearchState {
     uint64_t selected_mate_id = 0;
 };
 
+// First NUM_REGISTERS bytes of memory act as registers.
+// Program execution starts at address NUM_REGISTERS.
+static constexpr uint8_t NUM_REGISTERS = 8;
+
 class Brain {
 public:
     explicit Brain(const std::vector<uint8_t>& genome);
@@ -114,7 +118,7 @@ public:
 
 private:
     std::vector<uint8_t> memory_;
-    uint16_t ip_ = 0;
+    uint16_t ip_ = NUM_REGISTERS;
     bool halted_ = false;
     bool trace_enabled_ = false;
     std::optional<ExecutionTrace> last_trace_;
@@ -123,6 +127,12 @@ private:
 
     // Out-of-bounds tracking for current tick
     uint32_t oob_count_ = 0;
+
+    // Last-referenced register index (for register addressing mode)
+    uint8_t last_register_ = 0;
+
+    // Resolve a 16-bit address: if MSB set, redirect to registers
+    uint16_t resolve_address(uint16_t addr);
 
     // Execute a single instruction, returns true if should continue
     bool execute_instruction(Plant& plant, const World& world, std::mt19937_64& rng, std::vector<QueuedAction>& actions);
