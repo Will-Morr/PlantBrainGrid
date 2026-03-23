@@ -34,7 +34,7 @@ struct Config {
     float water_base = 0.8f;
     float water_amplitude = 2.0f;
     float water_min = 0.15f;
-    float nutrient_base = 0.75f;
+    float nutrient_base = 0.0f;
     float nutrient_amplitude = 3.0f;
 
     // Plants
@@ -96,15 +96,15 @@ struct Config {
 
     // Old age
     uint32_t max_cell_age = 1000;   // ticks before a cell dies of old age (0 = disabled)
-    uint32_t max_plant_age = 5000; // ticks before a plant dies of old age (0 = disabled)
+    uint32_t max_plant_age = 2500; // ticks before a plant dies of old age (0 = disabled)
 
     // Seasons (discrete)
-    uint32_t season_cycle_length = 600;
+    uint32_t season_cycle_length = 800;
     std::vector<SeasonDef> seasons = {
         {"Spring",  0,   1.0f, 2.0f, 1.0f},
         {"Summer",  200, 2.0f, 1.0f, 1.0f},
-        {"Fall",  400, 0.5f, 0.5f, 1.0f},
-        {"Winter",  800, 0.3f, 0.0f, 1.0f},
+        {"Fall",    400, 0.7f, 1.0f, 1.0f},
+        {"Winter",  600, 0.3f, 0.0f, 1.0f},
     };
 
     // Scaling for brain sensing (convert float resources to 0-255 byte)

@@ -38,9 +38,10 @@
     .db 0x00    ; byte 5: unused
     .db 0x00    ; byte 6: unused
 
+    .fill 50, 0x00
 main:
     PLACE_CELL Anther,    +0, -1
-    ; PLACE_CELL SmallLeaf, +1,  0
+    PLACE_CELL SmallLeaf, +1,  0
     PLACE_CELL SmallLeaf, -1,  0
     PLACE_CELL FiberRoot, +0, +1
 
@@ -48,7 +49,5 @@ reproduce:
     .fill 100, 0x01
 
     MATE_BY_SIZE 128, 1
-    LAUNCH_SEED RandomMix, 80, 10, 50, 15, +0, +0, random
-
-done:
-    HALT
+    LAUNCH_SEED RandomMix, 100, 10, 50, 15, +0, +0, random
+    JUMP 0x16
