@@ -102,7 +102,7 @@ struct Config {
     uint32_t season_cycle_length = 800;
     std::vector<SeasonDef> seasons = {
         {"Spring",  0,   1.0f, 2.0f, 1.0f},
-        {"Summer",  200, 2.0f, 1.0f, 1.0f},
+        {"Summer",  200, 1.2f, 1.0f, 1.0f},
         {"Fall",    400, 0.7f, 1.0f, 1.0f},
         {"Winter",  600, 0.3f, 0.0f, 1.0f},
     };
