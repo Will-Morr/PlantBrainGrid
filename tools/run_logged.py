@@ -25,6 +25,7 @@ Requirements:
 
 import argparse
 import hashlib
+import json
 import os
 import random as pyrandom
 import struct
@@ -262,6 +263,10 @@ def main():
     rng = pyrandom.Random(seed)
     sim = pbg.Simulation(width, height, seed)
     sim.load_state(args.init_path)
+
+    # Write metadata so downstream tools know the actual world dimensions
+    with open(os.path.join(args.output, "sim_metadata.json"), "w") as f:
+        json.dump({"width": width, "height": height, "seed": int(seed)}, f)
 
     genome_template: list | None = None
     if args.genome:

@@ -19,6 +19,7 @@ Requirements:
 """
 
 import argparse
+import json
 import math
 import os
 import sys
@@ -270,30 +271,25 @@ def plot_population(tick_stats: dict, img_dir: str) -> str:
     return "images/population.png"
 
 
-def plot_terrain_maps(log_dir: str, img_dir: str) -> tuple[str, str]:
+def plot_terrain_maps(log_dir: str, img_dir: str, world_w: int, world_h: int,
+                      world_seed: int) -> tuple[str, str]:
     """Generate water and nutrient distribution maps using Perlin noise params."""
-    # We'll reconstruct from the simulation. Try importing pbg bindings.
     try:
         sys.path.insert(0, os.path.join(_SCRIPT_DIR, ".."))
         import _plantbraingrid as pbg
 
-        # Read world dimensions from tick_stats or use defaults
-        stats_path = os.path.join(log_dir, "tick_stats.parquet")
-        cfg = pbg.get_config()
-        w, h = cfg.world_width, cfg.world_height
+        world = pbg.World(world_w, world_h, world_seed)
 
-        world = pbg.World(w, h, 42)
-
-        water = np.zeros((h, w), dtype=np.float32)
-        nutrients = np.zeros((h, w), dtype=np.float32)
-        for y in range(h):
-            for x in range(w):
+        water = np.zeros((world_h, world_w), dtype=np.float32)
+        nutrients = np.zeros((world_h, world_w), dtype=np.float32)
+        for y in range(world_h):
+            for x in range(world_w):
                 cell = world.cell_at(x, y)
                 water[y, x] = cell.water_level
                 nutrients[y, x] = cell.nutrient_level
 
         fig, ax = plt.subplots(figsize=(6, 6))
-        ax.imshow(water, origin="lower", cmap="Blues", aspect="equal")
+        ax.imshow(water, origin="upper", cmap="Blues", aspect="equal")
         ax.set_title("Water Distribution")
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
@@ -303,7 +299,7 @@ def plot_terrain_maps(log_dir: str, img_dir: str) -> tuple[str, str]:
         plt.close(fig)
 
         fig, ax = plt.subplots(figsize=(6, 6))
-        ax.imshow(nutrients, origin="lower", cmap="YlOrBr", aspect="equal")
+        ax.imshow(nutrients, origin="upper", cmap="YlOrBr", aspect="equal")
         ax.set_title("Nutrient Distribution")
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
@@ -325,7 +321,7 @@ def plot_cluster_heatmap(xs, ys, mask, cluster_id, color, img_dir, world_w, worl
         xs[mask], ys[mask], bins=64,
         range=[[0, world_w], [0, world_h]],
     )
-    ax.imshow(H.T, origin="lower", aspect="equal", interpolation="bilinear",
+    ax.imshow(H.T, origin="upper", aspect="equal", interpolation="bilinear",
               extent=[0, world_w, 0, world_h], cmap=cmap)
     ax.set_title(f"Cluster {cluster_id} Spatial Distribution (n={int(mask.sum())})")
     ax.set_xlabel("X")
@@ -535,15 +531,17 @@ def main():
     total_ticks = max(ticks) - min(ticks) + 1 if ticks else 0
     max_pop = max(tick_stats["plant_count"]) if tick_stats["plant_count"] else 0
 
-    # Try to get world dimensions from bindings
-    world_w, world_h = 128, 128
-    try:
-        sys.path.insert(0, os.path.join(_SCRIPT_DIR, ".."))
-        import _plantbraingrid as pbg
-        cfg = pbg.get_config()
-        world_w, world_h = cfg.world_width, cfg.world_height
-    except ImportError:
-        pass
+    # Read world dimensions from metadata written by run_logged.py
+    metadata_path = os.path.join(log_dir, "sim_metadata.json")
+    world_seed = 42
+    if os.path.exists(metadata_path):
+        with open(metadata_path) as f:
+            metadata = json.load(f)
+        world_w, world_h = metadata["width"], metadata["height"]
+        world_seed = metadata.get("seed", 42)
+    else:
+        print(f"[WARN] {metadata_path} not found, inferring world size from plant positions")
+        world_w, world_h = 128, 128  # will be overridden below after loading positions
 
     md("# Simulation Overview Report")
     md()
@@ -568,7 +566,7 @@ def main():
 
     # ── Terrain maps ─────────────────────────────────────────────────────────
     print("Generating terrain maps...")
-    water_img, nutrient_img = plot_terrain_maps(log_dir, img_dir)
+    water_img, nutrient_img = plot_terrain_maps(log_dir, img_dir, world_w, world_h, world_seed)
     if water_img and nutrient_img:
         md("## Terrain Distribution")
         md()

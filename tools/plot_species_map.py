@@ -350,7 +350,7 @@ def plot_cluster_heatmaps(
             f"c{cid}", [bg, palette[cid]]
         )
         ax.imshow(
-            H, origin="lower", aspect="auto", interpolation="bilinear",
+            H, origin="upper", aspect="auto", interpolation="bilinear",
             extent=[x_range[0], x_range[1], y_range[0], y_range[1]],
             cmap=cmap,
         )
@@ -519,6 +519,7 @@ def main():
     ax.set_xlabel("World X", fontsize=11)
     ax.set_ylabel("World Y", fontsize=11)
     ax.set_aspect("equal", adjustable="datalim")
+    ax.invert_yaxis()  # World Y=0 is at the top
 
     title_parts = [
         f"{N} plants",
