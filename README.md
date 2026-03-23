@@ -7,9 +7,31 @@ Fair warning, this is my first real vibe code project (if that isn't obvious fro
 ## Overview
 
 - **World**: 2D grid with water/nutrients (Perlin noise), light levels varying by season, and fire propagation
-- **Plants**: Multicellular organisms that place cells (leaves, roots, xylem, thorns, fire starters)
+- **Plants**: Multicellular organisms that place cells (leaves, roots, bark, thorns, fire starters, storage organs, haustoria)
 - **Brain VM**: 160-opcode bytecode interpreter — senses the world, queues cell placement/removal, launches seeds
-- **Evolution**: Sexual/asexual reproduction with configurable recombination and per-byte random mutation
+- **Evolution**: Sexual reproduction with configurable recombination and per-byte random mutation
+
+## Cell Types
+
+Each plant is made of cells placed on adjacent grid tiles. The primary cell is created at birth; all others are placed by the brain VM.
+
+| Cell | Description | Key stats |
+|------|-------------|-----------|
+| **Primary** | The plant's origin cell. Destroying it kills the plant. Draws a small amount of water passively. | water +0.2/tick |
+| **SmallLeaf** | Generates energy from light. Cheap to build and maintain. | energy +1.0/tick, costs 10E to build |
+| **BigLeaf** | High energy output but consumes water and nutrients. | energy +5.0/tick, costs 25E+10N to build |
+| **FiberRoot** | Extracts water and nutrients from the soil. | water +1.2/tick, nutrients +1.0/tick |
+| **TapRoot** | Deep root that draws more water than FiberRoot but no nutrients. | water +3.5/tick |
+| **Anther** | Required for reproduction. Must be present to launch seeds. | costs 10E to build |
+| **Bark** | Fireproof armor. Protects the tile from fire damage. | costs 1W+1N to build |
+| **Thorn** | Blocks other plants from placing cells on this tile. | costs 5E to build |
+| **FireStarter** | Ignites the tile it occupies. Expensive, one-shot offensive cell. | costs 30E to build |
+| **StoreEnergy** | Increases the plant's energy storage cap by 300. | costs 10E to build |
+| **StoreWater** | Increases the plant's water storage cap by 300. | costs 10E to build |
+| **StoreNutrients** | Increases the plant's nutrients storage cap by 300. | costs 10E to build |
+| **Haustorium** | Parasitic cell that steals resources from adjacent enemy plants. | steals 0.5/tick per neighbor |
+
+Base resource cap is 300 for each resource. Store cells stack additively.
 
 ## Building
 
@@ -76,9 +98,17 @@ python -m plantbraingrid --width 512 --height 512 --seed 42
 
 Visual controls:
 - **Click** a plant to select it and view its brain state
+- **Arrow keys / WASD** — pan the camera
+- **Mouse wheel / +/-** — zoom in/out
 - **`.`** (period) — increase simulation speed (double ticks per frame)
 - **`,`** (comma) — decrease simulation speed
-- **`P`** — pause/unpause
+- **Space / P** — pause/unpause
+- **N** — advance exactly one tick (while paused)
+- **1** — toggle water overlay
+- **2** — toggle nutrient overlay
+- **M** — toggle brain memory hex dump (selected plant)
+- **F** — toggle fullscreen
+- **Escape** — deselect plant
 
 #### Visual with auto-spawn
 
@@ -156,6 +186,7 @@ See `examples/` for complete working examples:
 | `root_farmer.asm` | Build a deep root network to maximise water extraction |
 | `reproducer.asm` | Accumulate energy then launch clonal seeds |
 | `fire_starter.asm` | Build fireproof xylem, burn neighbours, reproduce into cleared land |
+| `single_reproducer.py` | Python script — auto-spawn random plants and watch them evolve |
 
 ### Genome Analyzer
 
@@ -171,6 +202,52 @@ Output includes:
 - Instruction category breakdown (control flow, sensing, actions, reproduction)
 - Loop detection (backward jumps)
 - Complexity score (0–100)
+
+### Logged Simulation Runner
+
+Runs a simulation and writes per-tick and per-plant data to Parquet files for analysis. Requires `pyarrow`.
+
+```bash
+python tools/run_logged.py --ticks 5000
+python tools/run_logged.py --ticks 2000 --genome examples/reproducer.bin --output runs/exp1
+python tools/run_logged.py --ticks 1000 --trace --log-every 10 --width 128 --height 128
+```
+
+Produces:
+- `tick_stats.parquet` — one row per tick (population, wall time)
+- `plant_ticks.parquet` — per-plant snapshots every `--log-every` ticks
+- `plant_events.parquet` — birth and death records
+- `reproduction_events.parquet` — every seed launch (parents, genome hash)
+- `genomes.parquet` — full genome bytes captured at birth
+
+### Simulation Overview Report
+
+Generates a Markdown report with charts from logged simulation data. Requires `pyarrow`, `numpy`, `matplotlib`, `scikit-learn`.
+
+```bash
+python tools/generate_overview.py logs/
+python tools/generate_overview.py logs/ --eps 200 --min-samples 5 --output report/
+```
+
+Includes population graphs, water/nutrient maps, species clusters (DBSCAN on genome Hamming distance), per-cluster spatial heatmaps, lifespan histograms, body plans, and opcode usage.
+
+### Genome Heatmap
+
+Plots a pairwise genome-difference heatmap from logged data. Optionally reorders by hierarchical clustering. Requires `pyarrow`, `numpy`, `matplotlib`, and optionally `scipy`.
+
+```bash
+python tools/plot_genome_heatmap.py logs/
+python tools/plot_genome_heatmap.py logs/ --max-plants 300 --no-cluster
+```
+
+### Species Map
+
+Clusters plants by genome similarity (DBSCAN) and plots them by world position, colored by species. Requires `pyarrow`, `numpy`, `matplotlib`, `scikit-learn`.
+
+```bash
+python tools/plot_species_map.py logs/
+python tools/plot_species_map.py logs/ --eps 150 --min-ticks-lived 100 --output species.png
+```
 
 ## Loading Plants into the Simulation
 
@@ -306,12 +383,16 @@ src/python/plantbraingrid/
   brain_viewer.py   Hex dump and disassembler (pure Python)
 
 tools/
-  brain_assembler.py   .asm → bytecode
-  genome_analyzer.py   Genome statistics
+  brain_assembler.py      .asm → bytecode
+  genome_analyzer.py      Genome statistics
+  run_logged.py           Logged simulation runner (→ Parquet)
+  generate_overview.py    Markdown report from logs
+  plot_genome_heatmap.py  Pairwise genome-difference heatmap
+  plot_species_map.py     Species cluster scatter plot
 
 tests/cpp/          Catch2 unit tests
 tests/python/       pytest tests
-examples/           Example .asm brain programs
+examples/           Example .asm brain programs and scripts
 ```
 
 ## Configuration
@@ -335,9 +416,97 @@ cfg.mutation_rate = 0.02f;
 cfg.brain_size = 512;
 ```
 
+## Brain VM Instructions
+
+The brain is a 1024-byte memory that doubles as code and data. Each tick the VM executes up to `max_instructions_per_tick` (default 1000) instructions starting from the instruction pointer. Opcodes are decoded as `memory[ip] % 160`.
+
+### Control Flow (0x00-0x0A)
+
+| Opcode | Mnemonic | Args | Description |
+|--------|----------|------|-------------|
+| 0x00 | NOP | — | No operation |
+| 0x01 | HALT | — | Stop execution for this tick |
+| 0x02 | JUMP | addr16 | Jump to absolute address |
+| 0x03 | JUMP_REL | offset8 | Jump relative (signed) |
+| 0x04 | JUMP_IF_ZERO | addr16, dest16 | Jump to dest if mem[addr] == 0 |
+| 0x05 | JUMP_IF_NEQ | a16, b16, dest16 | Jump if mem[a] != mem[b] |
+| 0x06 | CALL | addr16 | Push return address, jump to addr |
+| 0x07 | RET | — | Pop return address, jump back |
+| 0x08 | JUMP_GT | a16, b16, dest16 | Jump if mem[a] > mem[b] |
+| 0x09 | JUMP_EQ | a16, b16, dest16 | Jump if mem[a] == mem[b] |
+| 0x0A | JUMP_LT | a16, b16, dest16 | Jump if mem[a] < mem[b] |
+
+### Memory Operations (0x20-0x31)
+
+| Opcode | Mnemonic | Args | Description |
+|--------|----------|------|-------------|
+| 0x20 | LOAD_IMM | addr16, value8 | Store immediate value into memory |
+| 0x21 | COPY | dst16, src16 | Copy mem[src] to mem[dst] |
+| 0x22 | ADD | dst16, a16, b16 | mem[dst] = mem[a] + mem[b] |
+| 0x23 | SUB | dst16, a16, b16 | mem[dst] = mem[a] - mem[b] |
+| 0x24 | MUL | dst16, a16, b16 | mem[dst] = mem[a] * mem[b] |
+| 0x25 | DIV | dst16, a16, b16 | mem[dst] = mem[a] / mem[b] (0 if div by 0) |
+| 0x26 | MOD | dst16, a16, b16 | mem[dst] = mem[a] % mem[b] |
+| 0x27 | AND | dst16, a16, b16 | Bitwise AND |
+| 0x28 | OR | dst16, a16, b16 | Bitwise OR |
+| 0x29 | XOR | dst16, a16, b16 | Bitwise XOR |
+| 0x2A | NOT | dst16, src16 | Bitwise NOT |
+| 0x2B | SHL | dst16, a16, b16 | Shift left |
+| 0x2C | SHR | dst16, a16, b16 | Shift right |
+| 0x2D | CMP_LT | dst16, a16, b16 | mem[dst] = 1 if mem[a] < mem[b], else 0 |
+| 0x2E | CMP_EQ | dst16, a16, b16 | mem[dst] = 1 if mem[a] == mem[b], else 0 |
+| 0x2F | LOAD_IND | dst16, ptr16 | mem[dst] = mem[mem[ptr]] |
+| 0x30 | STORE_IND | ptr16, src16 | mem[mem[ptr]] = mem[src] |
+| 0x31 | RANDOMIZE | dst16 | mem[dst] = random byte |
+
+### World Sensing (0x40-0x4B)
+
+| Opcode | Mnemonic | Args | Description |
+|--------|----------|------|-------------|
+| 0x40 | SENSE_WATER | dst16 | Water level at primary cell |
+| 0x41 | SENSE_NUTRIENTS | dst16 | Nutrient level at primary cell |
+| 0x42 | SENSE_LIGHT | dst16 | Light level at primary cell |
+| 0x43 | SENSE_CELL | dst16, dx8, dy8 | Cell type at offset (dx,dy) |
+| 0x44 | SENSE_FIRE | dst16, dx8, dy8 | Fire state at offset |
+| 0x45 | SENSE_OWNED | dst16, dx8, dy8 | 1 if own cell at offset, else 0 |
+| 0x46 | SENSE_SELF_ENERGY | dst16 | Plant's current energy |
+| 0x47 | SENSE_SELF_WATER | dst16 | Plant's current water |
+| 0x48 | SENSE_SELF_NUTRIENTS | dst16 | Plant's current nutrients |
+| 0x49 | SENSE_CELL_COUNT | dst16 | Number of cells this plant has |
+| 0x4A | SENSE_AGE | dst16 | Plant's age in ticks |
+| 0x4B | SENSE_SEASON | dst16 | Current season index (0-3) |
+
+### Plant Actions (0x60-0x63)
+
+| Opcode | Mnemonic | Args | Description |
+|--------|----------|------|-------------|
+| 0x60 | PLACE_CELL | type8, dx8, dy8, dir8 | Place a cell at offset. Type is modulo 14 |
+| 0x61 | ROTATE_CELL | dx8, dy8, dir8 | Rotate an existing cell |
+| 0x62 | TOGGLE_CELL | dx8, dy8 | Enable/disable a cell |
+| 0x63 | REMOVE_CELL | dx8, dy8 | Remove own cell at offset |
+
+### Reproduction (0x80-0x89)
+
+Mate selection works by accumulating weighted criteria, then launching a seed. Each `MATE_BY_*` instruction adds one criterion to the current mate search.
+
+| Opcode | Mnemonic | Args | Description |
+|--------|----------|------|-------------|
+| 0x80 | MATE_BY_SIZE | max_dist8, magnitude8 | Prefer mates by cell count |
+| 0x81 | MATE_BY_AGE | max_dist8, magnitude8 | Prefer older/younger mates |
+| 0x82 | MATE_BY_ENERGY | max_dist8, magnitude8 | Prefer mates with more energy |
+| 0x83 | MATE_BY_WATER | max_dist8, magnitude8 | Prefer mates with more water |
+| 0x84 | MATE_BY_NUTRIENTS | max_dist8, magnitude8 | Prefer mates with more nutrients |
+| 0x85 | MATE_BY_DISTANCE | max_dist8, magnitude8 | Prefer closer/farther mates |
+| 0x86 | MATE_BY_SIMILARITY | max_dist8, magnitude8 | Prefer genetically similar mates |
+| 0x87 | MATE_BY_DIFFERENCE | max_dist8, magnitude8 | Prefer genetically different mates |
+| 0x88 | MATE_BY_CELL_COUNT | max_dist8, cell_type8, target8, magnitude8 | Prefer mates by count of a specific cell type |
+| 0x89 | LAUNCH_SEED | energy8, water8, nutrients8, dx8, dy8, dist8, recomb8, mutations8 | Launch a seed with the selected mate |
+
+Recombination methods for LAUNCH_SEED (recomb byte % 4): RandomMix (0), Alternating (1), Mother75 (2), Father75 (3).
+
 ## Mutation
 
-During reproduction, child genomes are built from the parents' genomes via the chosen recombination method (`MotherOnly`, `HalfHalf`, `RandomMix`, etc.), then each byte independently has a `mutation_rate` probability of being replaced with a uniformly random value (0–255). The default rate is 1% (`mutation_rate = 0.01`).
+During reproduction, child genomes are built from the parents' genomes via the chosen recombination method (RandomMix, Alternating, Mother75, Father75), then each byte independently has a `mutation_rate` probability of being replaced with a uniformly random value (0-255). The default rate is 0.1% (`mutation_rate = 0.001`).
 
 ## Saving and Loading
 
