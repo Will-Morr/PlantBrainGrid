@@ -27,6 +27,7 @@ import argparse
 import hashlib
 import os
 import random as pyrandom
+import struct
 import sys
 import time
 
@@ -211,6 +212,24 @@ def _plant_tick_row(tick: int, p, trace_map: dict | None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Save-file header reader
+# ---------------------------------------------------------------------------
+
+def read_save_header(path: str) -> dict:
+    """Read width, height, and seed from a PBGS save file header."""
+    with open(path, "rb") as f:
+        data = f.read(4 + 4 + 8 + 8 + 4 + 4 + 8)  # magic, version, tick, next_id, w, h, seed
+    if len(data) < 40:
+        raise ValueError(f"Save file too short: {path}")
+    magic, version = struct.unpack_from("<II", data, 0)
+    if magic != 0x50424753 or version != 1:
+        raise ValueError(f"Invalid save file (magic=0x{magic:08X}, version={version}): {path}")
+    w, h = struct.unpack_from("<II", data, 24)
+    seed, = struct.unpack_from("<Q", data, 32)
+    return {"width": w, "height": h, "seed": seed}
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -221,9 +240,6 @@ def main():
     )
     parser.add_argument("ticks",      type=int,  help="Ticks to simulate")
     parser.add_argument("init_path",  type=str,   help="Path to initial sim state")
-    parser.add_argument("--width",      type=int, default=128,    help="World width")
-    parser.add_argument("--height",     type=int, default=128,    help="World height")
-    parser.add_argument("--seed",       type=int, default=42,     help="RNG seed")
     parser.add_argument("--genome",     type=str, default=None,
                         help="Path to .bin genome (default: random genomes)")
     parser.add_argument("--n-plants",   type=int, default=20,     help="Initial plant count")
@@ -240,12 +256,12 @@ def main():
     sinks = {name: Sink(os.path.join(args.output, f"{name}.parquet"), schema)
              for name, schema in schemas.items()}
 
-    # ── Build simulation ────────────────────────────────────────────────────
-    rng = pyrandom.Random(args.seed)
-    sim = pbg.Simulation(args.width, args.height, args.seed)
-
-    if args.init_path is not None:
-        sim.load_state(args.init_path)
+    # ── Build simulation (dimensions and seed come from save file) ───────
+    header = read_save_header(args.init_path)
+    width, height, seed = header["width"], header["height"], header["seed"]
+    rng = pyrandom.Random(seed)
+    sim = pbg.Simulation(width, height, seed)
+    sim.load_state(args.init_path)
 
     genome_template: list | None = None
     if args.genome:
@@ -290,8 +306,8 @@ def main():
     sim.on_plant_death(on_death)
     sim.on_seed_launch(on_seed)
 
-    cx, cy = args.width // 2, args.height // 2
-    spacing = max(3, args.width // (args.n_plants + 2))
+    cx, cy = width // 2, height // 2
+    spacing = max(3, width // (args.n_plants + 2))
     start_x = cx - (args.n_plants // 2) * spacing
 
     placed = 0
@@ -306,7 +322,7 @@ def main():
 
     # ── Run loop ────────────────────────────────────────────────────────────
     genome_desc = args.genome or "random"
-    print(f"World:    {args.width}×{args.height}  seed={args.seed}")
+    print(f"World:    {width}×{height}  seed={seed}  (from {args.init_path})")
     print(f"Plants:   {placed} initial  genome={genome_desc}")
     print(f"Ticks:    {args.ticks}  log_every={args.log_every}  trace={args.trace}")
     print(f"Output:   {args.output}/")

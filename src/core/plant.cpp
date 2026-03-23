@@ -202,7 +202,10 @@ void Plant::cull_old_cells(uint32_t max_cell_age, World& world) {
     // governed by max_plant_age, not per-cell age).
     std::vector<GridCoord> to_remove;
     for (const auto& cell : cells_) {
-        if (cell.position != primary_pos_ && cell.age_ticks >= max_cell_age) {
+        if (cell.position != primary_pos_ && cell.age_ticks >= max_cell_age &&
+            cell.type != CellType::StoreEnergy &&
+            cell.type != CellType::StoreWater &&
+            cell.type != CellType::StoreNutrients) {
             to_remove.push_back(cell.position);
         }
     }
