@@ -106,6 +106,7 @@ def make_schemas(trace: bool) -> dict[str, pa.Schema]:
         ("seeds_launched",       pa.int32()),
         ("seeds_germinated",     pa.int32()),
         ("plants_died",          pa.int32()),
+        ("season",               pa.utf8()),
         ("tick_ms",              pa.float32()),
     ])
 
@@ -264,9 +265,20 @@ def main():
     sim = pbg.Simulation(width, height, seed)
     sim.load_state(args.init_path)
 
-    # Write metadata so downstream tools know the actual world dimensions
+    # Write metadata so downstream tools know the actual world dimensions and seasons
+    cfg = pbg.get_config()
+    season_list = [
+        {"name": s.name, "start_tick": s.start_tick,
+         "light_mult": s.light_mult, "water_mult": s.water_mult,
+         "nutrient_mult": s.nutrient_mult}
+        for s in cfg.seasons
+    ]
     with open(os.path.join(args.output, "sim_metadata.json"), "w") as f:
-        json.dump({"width": width, "height": height, "seed": int(seed)}, f)
+        json.dump({
+            "width": width, "height": height, "seed": int(seed),
+            "season_cycle_length": cfg.season_cycle_length,
+            "seasons": season_list,
+        }, f)
 
     genome_template: list | None = None
     if args.genome:
@@ -343,6 +355,10 @@ def main():
         stats = sim.advance_tick()
         tick_ms = (time.perf_counter() - t0) * 1000.0
 
+        world = sim.world()
+        season_idx = world.current_season_index()
+        season_name = pbg.get_config().seasons[season_idx].name
+
         sinks["tick_stats"].append(
             tick=stats.tick,
             plant_count=stats.plant_count,
@@ -353,6 +369,7 @@ def main():
             seeds_launched=stats.seeds_launched,
             seeds_germinated=stats.seeds_germinated,
             plants_died=stats.plants_died,
+            season=season_name,
             tick_ms=float(tick_ms),
         )
 

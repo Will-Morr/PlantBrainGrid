@@ -253,12 +253,65 @@ def make_palette(n: int) -> list:
 # Plot helpers — each returns relative path to saved image
 # ---------------------------------------------------------------------------
 
-def plot_population(tick_stats: dict, img_dir: str) -> str:
+DEFAULT_SEASON_DEFS = [
+    ("Spring",  0,   "#2e7d32"),  # green
+    ("Summer", 200,  "#f9a825"),  # gold
+    ("Fall",   400,  "#e65100"),  # orange
+]
+DEFAULT_SEASON_CYCLE_LENGTH = 600
+
+SEASON_COLORS = {
+    "Spring": "#2e7d32",
+    "Summer": "#f9a825",
+    "Fall":   "#e65100",
+    "Winter": "#5c6bc0",
+}
+
+
+def _season_bands(ticks, ax, metadata=None):
+    """Draw coloured vertical bands for each season behind the plot."""
+    if not ticks:
+        return
+
+    # Use metadata seasons if available, otherwise defaults
+    if metadata and "seasons" in metadata:
+        season_defs = [
+            (s["name"], s["start_tick"],
+             SEASON_COLORS.get(s["name"], "#888888"))
+            for s in metadata["seasons"]
+        ]
+        cycle_len = metadata.get("season_cycle_length", DEFAULT_SEASON_CYCLE_LENGTH)
+    else:
+        season_defs = DEFAULT_SEASON_DEFS
+        cycle_len = DEFAULT_SEASON_CYCLE_LENGTH
+
+    t_min, t_max = min(ticks), max(ticks)
+    cycle_start = (t_min // cycle_len) * cycle_len
+    while cycle_start <= t_max:
+        for i, (name, offset, color) in enumerate(season_defs):
+            band_lo = cycle_start + offset
+            if i + 1 < len(season_defs):
+                band_hi = cycle_start + season_defs[i + 1][1]
+            else:
+                band_hi = cycle_start + cycle_len
+            lo = max(band_lo, t_min)
+            hi = min(band_hi, t_max)
+            if lo < hi:
+                ax.axvspan(lo, hi, color=color, alpha=0.12, zorder=0)
+        cycle_start += cycle_len
+
+    from matplotlib.patches import Patch
+    handles = [Patch(facecolor=c, alpha=0.3, label=n) for n, _, c in season_defs]
+    ax.legend(handles=handles, loc="upper right", fontsize=7, framealpha=0.5)
+
+
+def plot_population(tick_stats: dict, img_dir: str, metadata=None) -> str:
     ticks = tick_stats["tick"]
     pop = tick_stats["plant_count"]
 
     fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(ticks, pop, linewidth=0.8, color="cyan")
+    _season_bands(ticks, ax, metadata=metadata)
+    ax.plot(ticks, pop, linewidth=0.8, color="cyan", zorder=2)
     ax.set_xlabel("Tick")
     ax.set_ylabel("Plant Count")
     ax.set_title("Population Over Time")
@@ -288,8 +341,13 @@ def plot_terrain_maps(log_dir: str, img_dir: str, world_w: int, world_h: int,
                 water[y, x] = cell.water_level
                 nutrients[y, x] = cell.nutrient_level
 
+        # Custom cmaps that go from black -> colour
+        water_cmap = LinearSegmentedColormap.from_list("water_bk", ["black", "#1565C0", "#42A5F5"])
+        nutrient_cmap = LinearSegmentedColormap.from_list("nut_bk", ["black", "#E65100", "#FFD54F"])
+
         fig, ax = plt.subplots(figsize=(6, 6))
-        ax.imshow(water, origin="upper", cmap="Blues", aspect="equal")
+        ax.set_facecolor("black")
+        ax.imshow(water, origin="upper", cmap=water_cmap, aspect="equal")
         ax.set_title("Water Distribution")
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
@@ -299,7 +357,8 @@ def plot_terrain_maps(log_dir: str, img_dir: str, world_w: int, world_h: int,
         plt.close(fig)
 
         fig, ax = plt.subplots(figsize=(6, 6))
-        ax.imshow(nutrients, origin="upper", cmap="YlOrBr", aspect="equal")
+        ax.set_facecolor("black")
+        ax.imshow(nutrients, origin="upper", cmap=nutrient_cmap, aspect="equal")
         ax.set_title("Nutrient Distribution")
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
@@ -367,17 +426,37 @@ CELL_COLORS_RGB = {
 }
 
 
+def _compute_body_costs(plan: dict[str, int]):
+    """Return (total_build, total_income, total_maint) each [energy, water, nutrients]."""
+    total_build = [0.0, 0.0, 0.0]
+    total_income = [0.0, 0.0, 0.0]
+    total_maint = [0.0, 0.0, 0.0]
+    for name, count in plan.items():
+        costs = CELL_COSTS.get(name, (0, 0, 0, 0, 0, 0))
+        income = CELL_INCOME.get(name, (0, 0, 0))
+        total_build[0] += costs[0] * count
+        total_build[1] += costs[1] * count
+        total_build[2] += costs[2] * count
+        total_maint[0] += costs[3] * count
+        total_maint[1] += costs[4] * count
+        total_maint[2] += costs[5] * count
+        total_income[0] += income[0] * count
+        total_income[1] += income[1] * count
+        total_income[2] += income[2] * count
+    return total_build, total_income, total_maint
+
+
 def plot_body_plan(layout: list[tuple[str, int, int]], plan: dict[str, int],
                    plan_key: str, cluster_id: int, plan_idx: int,
-                   img_dir: str) -> str:
-    """Render body plan: visual grid (left), cell count list (middle-right)."""
+                   img_dir: str, count: int = 0, pct: float = 0.0) -> str:
+    """Render body plan as a self-contained image with grid, cell legend, stats, and cost table."""
     import matplotlib.gridspec as gridspec
     from matplotlib.patches import Rectangle
 
     # Build cell grid: primary at (0,0) plus all PLACE_CELL offsets
     cells: dict[tuple[int, int], str] = {(0, 0): "Primary"}
     for name, dx, dy in layout:
-        cells[(dx, dy)] = name  # last write wins for overlapping positions
+        cells[(dx, dy)] = name
 
     if not cells:
         return ""
@@ -386,11 +465,11 @@ def plot_body_plan(layout: list[tuple[str, int, int]], plan: dict[str, int],
     all_y = [p[1] for p in cells]
     min_x, max_x = min(all_x) - 1, max(all_x) + 1
     min_y, max_y = min(all_y) - 1, max(all_y) + 1
-    grid_w = max_x - min_x + 1
     grid_h = max_y - min_y + 1
 
-    fig = plt.figure(figsize=(8, max(3, grid_h * 0.4 + 1)))
-    gs = gridspec.GridSpec(1, 2, width_ratios=[3, 2], wspace=0.3)
+    # 3 columns: grid | cell legend | cost table
+    fig = plt.figure(figsize=(10, max(3.5, grid_h * 0.4 + 1.5)))
+    gs = gridspec.GridSpec(1, 3, width_ratios=[3, 2, 2.5], wspace=0.3)
 
     # ── Left: visual grid ────────────────────────────────────────────────────
     ax_grid = fig.add_subplot(gs[0])
@@ -412,34 +491,68 @@ def plot_body_plan(layout: list[tuple[str, int, int]], plan: dict[str, int],
     ax_grid.tick_params(labelsize=6)
     ax_grid.invert_yaxis()
 
-    # ── Right: cell count list ───────────────────────────────────────────────
-    ax_text = fig.add_subplot(gs[1])
-    ax_text.axis("off")
+    # ── Middle: cell count legend ────────────────────────────────────────────
+    ax_legend = fig.add_subplot(gs[1])
+    ax_legend.axis("off")
 
-    # Build sorted cell list with colour swatches
-    lines = []
     sorted_cells = sorted(plan.items(), key=lambda x: -x[1])
-    # Add Primary (always 1)
     sorted_cells.insert(0, ("Primary", 1))
 
-    y_pos = 0.95
-    for name, count in sorted_cells:
+    # Header with count and percentage
+    ax_legend.text(0.0, 1.0, f"{count} plants ({pct:.1f}%)",
+                   fontsize=9, color="white", fontweight="bold",
+                   va="top", transform=ax_legend.transAxes)
+
+    y_pos = 0.90
+    for name, cnt in sorted_cells:
         cid_cell = CELL_NAME_TO_ID.get(name, 0)
         r, g, b = CELL_COLORS_RGB.get(cid_cell, (255, 0, 240))
         color = (r / 255, g / 255, b / 255)
-
-        # Colour swatch
-        ax_text.add_patch(Rectangle(
+        ax_legend.add_patch(Rectangle(
             (0.0, y_pos - 0.03), 0.06, 0.04,
             facecolor=color, edgecolor="white", linewidth=0.5,
-            transform=ax_text.transAxes, clip_on=False,
+            transform=ax_legend.transAxes, clip_on=False,
         ))
-        ax_text.text(0.09, y_pos - 0.01, f"{count}x {name}",
-                     fontsize=8, color="white", va="center",
-                     transform=ax_text.transAxes)
+        ax_legend.text(0.09, y_pos - 0.01, f"{cnt}x {name}",
+                       fontsize=8, color="white", va="center",
+                       transform=ax_legend.transAxes)
         y_pos -= 0.07
 
-    fig.suptitle(f"{plan_key}", fontsize=9, y=1.01)
+    # ── Right: cost table ────────────────────────────────────────────────────
+    ax_table = fig.add_subplot(gs[2])
+    ax_table.axis("off")
+
+    total_build, total_income, total_maint = _compute_body_costs(plan)
+
+    def fmt(v):
+        return f"{v:.2f}" if v != 0 else "—"
+
+    table_data = [
+        ["Energy",    fmt(total_build[0]), fmt(total_income[0]), fmt(total_maint[0])],
+        ["Water",     fmt(total_build[1]), fmt(total_income[1]), fmt(total_maint[1])],
+        ["Nutrients", fmt(total_build[2]), fmt(total_income[2]), fmt(total_maint[2])],
+    ]
+    col_labels = ["", "Build", "Income/t", "Maint/t"]
+
+    tbl = ax_table.table(
+        cellText=table_data, colLabels=col_labels,
+        loc="upper center", cellLoc="center",
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(7)
+    tbl.scale(1.0, 1.3)
+    # Style table cells for dark background
+    for (row, col), cell in tbl.get_celld().items():
+        cell.set_edgecolor("gray")
+        cell.set_text_props(color="white")
+        if row == 0:
+            cell.set_facecolor("#333333")
+        else:
+            cell.set_facecolor("#1a1a1a")
+
+    ax_table.set_title("Resource Costs", fontsize=9, pad=8)
+
+    fig.suptitle(plan_key, fontsize=9, y=1.01)
     plt.tight_layout()
 
     fname = f"cluster_{cluster_id}_body_{plan_idx}.png"
@@ -447,38 +560,6 @@ def plot_body_plan(layout: list[tuple[str, int, int]], plan: dict[str, int],
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
     return f"images/{fname}"
-
-
-def body_plan_cost_table(plan: dict[str, int]) -> list[str]:
-    """Return markdown lines for a 3x3 resource cost table (rows=resource, cols=build/income/maint)."""
-    total_build = [0.0, 0.0, 0.0]   # energy, water, nutrients
-    total_income = [0.0, 0.0, 0.0]
-    total_maint = [0.0, 0.0, 0.0]
-
-    for name, count in plan.items():
-        costs = CELL_COSTS.get(name, (0, 0, 0, 0, 0, 0))
-        income = CELL_INCOME.get(name, (0, 0, 0))
-        total_build[0] += costs[0] * count
-        total_build[1] += costs[1] * count
-        total_build[2] += costs[2] * count
-        total_maint[0] += costs[3] * count
-        total_maint[1] += costs[4] * count
-        total_maint[2] += costs[5] * count
-        total_income[0] += income[0] * count
-        total_income[1] += income[1] * count
-        total_income[2] += income[2] * count
-
-    def fmt(v):
-        return f"{v:.2f}" if v != 0 else "—"
-
-    lines = [
-        "| | Build | Income/tick | Maint/tick |",
-        "|---|---|---|---|",
-        f"| Energy | {fmt(total_build[0])} | {fmt(total_income[0])} | {fmt(total_maint[0])} |",
-        f"| Water | {fmt(total_build[1])} | {fmt(total_income[1])} | {fmt(total_maint[1])} |",
-        f"| Nutrients | {fmt(total_build[2])} | {fmt(total_income[2])} | {fmt(total_maint[2])} |",
-    ]
-    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -533,6 +614,7 @@ def main():
 
     # Read world dimensions from metadata written by run_logged.py
     metadata_path = os.path.join(log_dir, "sim_metadata.json")
+    metadata = {}
     world_seed = 42
     if os.path.exists(metadata_path):
         with open(metadata_path) as f:
@@ -558,7 +640,7 @@ def main():
 
     # ── Population graph ─────────────────────────────────────────────────────
     print("Plotting population...")
-    pop_img = plot_population(tick_stats, img_dir)
+    pop_img = plot_population(tick_stats, img_dir, metadata=metadata)
     md("## Population Over Time")
     md()
     md(f"![Population]({pop_img})")
@@ -711,24 +793,20 @@ def main():
 
         plan_idx = 0
         displayed_any = False
-        for key, count in plan_counter.most_common():
-            if count < args.min_body_count:
+        for key, bp_count in plan_counter.most_common():
+            if bp_count < args.min_body_count:
                 continue
             displayed_any = True
             plan = plan_map[key]
             layout = layout_map.get(key, [])
-            pct = count / cluster_size * 100
-            md(f"**{key}** — {count} plants ({pct:.1f}%)")
-            md()
+            pct = bp_count / cluster_size * 100
 
             if plan:
-                bp_img = plot_body_plan(layout, plan, key, cid, plan_idx, img_dir)
+                bp_img = plot_body_plan(layout, plan, key, cid, plan_idx,
+                                        img_dir, count=bp_count, pct=pct)
                 if bp_img:
-                    md(f"![Body plan]({bp_img})")
+                    md(f"![{key}]({bp_img})")
                     md()
-                for line in body_plan_cost_table(plan):
-                    md(line)
-                md()
             plan_idx += 1
 
         if not displayed_any:
