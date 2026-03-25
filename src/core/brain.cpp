@@ -99,6 +99,10 @@ int8_t Brain::read_arg_signed() {
     return static_cast<int8_t>(read_arg());
 }
 
+int8_t Brain::read_offset_arg() {
+    return static_cast<int8_t>(read_arg() & 0x9F);
+}
+
 std::vector<QueuedAction> Brain::execute_tick(Plant& plant, const World& world, std::mt19937_64& rng) {
     const auto& cfg = get_config();
     std::vector<QueuedAction> actions;
@@ -413,16 +417,14 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
         // World Sensing
         case OP_SENSE_WATER: {
             uint16_t dest = read_arg16();
-            int8_t dx = read_arg_signed();
-            int8_t dy = read_arg_signed();
+            int8_t dx = read_offset_arg();
+            int8_t dy = read_offset_arg();
             GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
 
             uint8_t value = 0;
-            if (std::abs(dx) <= cfg.vision_radius && std::abs(dy) <= cfg.vision_radius) {
-                if (world.in_bounds(pos)) {
-                    value = static_cast<uint8_t>(std::min(255.0f,
-                        world.cell_at(pos).water_level * cfg.resource_sense_scale));
-                }
+            if (world.in_bounds(pos)) {
+                value = static_cast<uint8_t>(std::min(255.0f,
+                    world.cell_at(pos).water_level * cfg.resource_sense_scale));
             }
             safe_write(dest, value);
             break;
@@ -430,16 +432,14 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
 
         case OP_SENSE_NUTRIENTS: {
             uint16_t dest = read_arg16();
-            int8_t dx = read_arg_signed();
-            int8_t dy = read_arg_signed();
+            int8_t dx = read_offset_arg();
+            int8_t dy = read_offset_arg();
             GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
 
             uint8_t value = 0;
-            if (std::abs(dx) <= cfg.vision_radius && std::abs(dy) <= cfg.vision_radius) {
-                if (world.in_bounds(pos)) {
-                    value = static_cast<uint8_t>(std::min(255.0f,
-                        world.cell_at(pos).nutrient_level * cfg.resource_sense_scale));
-                }
+            if (world.in_bounds(pos)) {
+                value = static_cast<uint8_t>(std::min(255.0f,
+                    world.cell_at(pos).nutrient_level * cfg.resource_sense_scale));
             }
             safe_write(dest, value);
             break;
@@ -454,17 +454,15 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
 
         case OP_SENSE_CELL: {
             uint16_t dest = read_arg16();
-            int8_t dx = read_arg_signed();
-            int8_t dy = read_arg_signed();
+            int8_t dx = read_offset_arg();
+            int8_t dy = read_offset_arg();
             GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
 
             uint8_t value = static_cast<uint8_t>(CellType::Empty);
-            if (std::abs(dx) <= cfg.vision_radius && std::abs(dy) <= cfg.vision_radius) {
-                if (world.in_bounds(pos)) {
-                    const WorldCell& wc = world.cell_at(pos);
-                    if (wc.is_occupied()) {
-                        value = static_cast<uint8_t>(wc.cell_type);
-                    }
+            if (world.in_bounds(pos)) {
+                const WorldCell& wc = world.cell_at(pos);
+                if (wc.is_occupied()) {
+                    value = static_cast<uint8_t>(wc.cell_type);
                 }
             }
             safe_write(dest, value);
@@ -473,15 +471,13 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
 
         case OP_SENSE_FIRE: {
             uint16_t dest = read_arg16();
-            int8_t dx = read_arg_signed();
-            int8_t dy = read_arg_signed();
+            int8_t dx = read_offset_arg();
+            int8_t dy = read_offset_arg();
             GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
 
             uint8_t value = 0;
-            if (std::abs(dx) <= cfg.vision_radius && std::abs(dy) <= cfg.vision_radius) {
-                if (world.in_bounds(pos)) {
-                    value = world.cell_at(pos).is_on_fire() ? 255 : 0;
-                }
+            if (world.in_bounds(pos)) {
+                value = world.cell_at(pos).is_on_fire() ? 255 : 0;
             }
             safe_write(dest, value);
             break;
@@ -489,15 +485,13 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
 
         case OP_SENSE_OWNED: {
             uint16_t dest = read_arg16();
-            int8_t dx = read_arg_signed();
-            int8_t dy = read_arg_signed();
+            int8_t dx = read_offset_arg();
+            int8_t dy = read_offset_arg();
             GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
 
             uint8_t value = 0;
-            if (std::abs(dx) <= cfg.vision_radius && std::abs(dy) <= cfg.vision_radius) {
-                if (plant.find_cell(pos) != nullptr) {
-                    value = 1;
-                }
+            if (plant.find_cell(pos) != nullptr) {
+                value = 1;
             }
             safe_write(dest, value);
             break;
@@ -551,8 +545,8 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
         // Plant Actions
         case OP_PLACE_CELL: {
             uint8_t type_byte = read_arg();
-            int8_t dx = read_arg_signed();
-            int8_t dy = read_arg_signed();
+            int8_t dx = read_offset_arg();
+            int8_t dy = read_offset_arg();
 
             CellType type = static_cast<CellType>(type_byte % 14);
             GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
@@ -574,8 +568,8 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
         }
 
         case OP_TOGGLE_CELL: {
-            int8_t dx = read_arg_signed();
-            int8_t dy = read_arg_signed();
+            int8_t dx = read_offset_arg();
+            int8_t dy = read_offset_arg();
             uint8_t enabled = read_arg();
 
             GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
@@ -589,8 +583,8 @@ bool Brain::execute_instruction(Plant& plant, const World& world, std::mt19937_6
         }
 
         case OP_REMOVE_CELL: {
-            int8_t dx = read_arg_signed();
-            int8_t dy = read_arg_signed();
+            int8_t dx = read_offset_arg();
+            int8_t dy = read_offset_arg();
 
             GridCoord pos = plant.primary_position() + GridCoord{dx, dy};
 

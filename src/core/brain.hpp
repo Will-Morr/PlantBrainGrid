@@ -147,6 +147,9 @@ private:
     uint8_t read_arg();
     uint16_t read_arg16();
     int8_t read_arg_signed();
+    // Read a spatial offset arg: ANDs raw byte with 0x9F (keeps sign bit +
+    // lower 5 bits) to cap magnitude at 31, then casts to int8_t.
+    int8_t read_offset_arg();
 };
 
 }  // namespace pbg

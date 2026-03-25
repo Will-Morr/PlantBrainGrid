@@ -84,6 +84,15 @@ RECOMB_NAMES = {
     0: "RandomMix", 1: "Alternating", 2: "Mother75", 3: "Father75",
 }
 
+# Mask applied to spatial offset bytes (matches Brain::read_offset_arg in C++)
+OFFSET_MASK = 0x9F
+
+
+def _masked_offset(raw: int) -> int:
+    """Apply the offset mask and interpret as signed int8."""
+    masked = raw & OFFSET_MASK
+    return masked if masked < 128 else masked - 256
+
 
 def decode_instruction(mem: bytes, ip: int) -> Optional[Tuple[str, List[int], int]]:
     """Decode one instruction at ip.
@@ -181,8 +190,8 @@ def format_instruction(name: str, args: List[int]) -> str:
         return f"RANDOMIZE {_fmt_addr(start)}, {args[2]}"
     if name in ("SENSE_WATER", "SENSE_NUTRIENTS", "SENSE_CELL", "SENSE_FIRE", "SENSE_OWNED"):
         dest = args[0] | (args[1] << 8)
-        dx = args[2] if args[2] < 128 else args[2] - 256
-        dy = args[3] if args[3] < 128 else args[3] - 256
+        dx = _masked_offset(args[2])
+        dy = _masked_offset(args[3])
         return f"{name} {_fmt_addr(dest)}, ({dx:+d},{dy:+d})"
     if name in ("SENSE_LIGHT", "SENSE_SELF_ENERGY", "SENSE_SELF_WATER",
                 "SENSE_SELF_NUTRIENTS", "SENSE_CELL_COUNT", "SENSE_AGE",
@@ -191,21 +200,21 @@ def format_instruction(name: str, args: List[int]) -> str:
         return f"{name} {_fmt_addr(dest)}"
     if name == "PLACE_CELL":
         ctype = CELL_TYPE_NAMES.get(args[0] % 14, f"Type{args[0]}")
-        dx = args[1] if args[1] < 128 else args[1] - 256
-        dy = args[2] if args[2] < 128 else args[2] - 256
+        dx = _masked_offset(args[1])
+        dy = _masked_offset(args[2])
         return f"PLACE_CELL {ctype}, ({dx:+d},{dy:+d})"
     if name == "ROTATE_CELL":
-        dx = args[0] if args[0] < 128 else args[0] - 256
-        dy = args[1] if args[1] < 128 else args[1] - 256
+        dx = _masked_offset(args[0])
+        dy = _masked_offset(args[1])
         rot = args[2] if args[2] < 128 else args[2] - 256
         return f"ROTATE_CELL ({dx:+d},{dy:+d}), {rot}"
     if name == "TOGGLE_CELL":
-        dx = args[0] if args[0] < 128 else args[0] - 256
-        dy = args[1] if args[1] < 128 else args[1] - 256
+        dx = _masked_offset(args[0])
+        dy = _masked_offset(args[1])
         return f"TOGGLE_CELL ({dx:+d},{dy:+d}), {'ON' if args[2] else 'OFF'}"
     if name == "REMOVE_CELL":
-        dx = args[0] if args[0] < 128 else args[0] - 256
-        dy = args[1] if args[1] < 128 else args[1] - 256
+        dx = _masked_offset(args[0])
+        dy = _masked_offset(args[1])
         return f"REMOVE_CELL ({dx:+d},{dy:+d})"
     if name in ("MATE_BY_SIZE", "MATE_BY_AGE", "MATE_BY_ENERGY", "MATE_BY_WATER",
                 "MATE_BY_NUTRIENTS", "MATE_BY_DISTANCE", "MATE_BY_SIMILARITY",
