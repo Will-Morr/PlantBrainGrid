@@ -100,9 +100,8 @@ int8_t Brain::read_arg_signed() {
 }
 
 int8_t Brain::read_offset_arg() {
-    uint8_t raw = read_arg() & 0x9F;
-    int8_t magnitude = static_cast<int8_t>(raw & 0x1F);
-    return (raw & 0x80) ? -magnitude : magnitude;
+    int8_t val = static_cast<int8_t>(read_arg());
+    return std::clamp(val, static_cast<int8_t>(-31), static_cast<int8_t>(31));
 }
 
 std::vector<QueuedAction> Brain::execute_tick(Plant& plant, const World& world, std::mt19937_64& rng) {

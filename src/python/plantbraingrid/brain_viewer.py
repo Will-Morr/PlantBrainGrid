@@ -84,15 +84,14 @@ RECOMB_NAMES = {
     0: "RandomMix", 1: "Alternating", 2: "Mother75", 3: "Father75",
 }
 
-# Mask applied to spatial offset bytes (matches Brain::read_offset_arg in C++)
-OFFSET_MASK = 0x9F
+# Maximum spatial offset magnitude (matches Brain::read_offset_arg in C++)
+MAX_OFFSET = 31
 
 
 def _masked_offset(raw: int) -> int:
-    """Apply the offset mask and interpret as sign-magnitude."""
-    masked = raw & OFFSET_MASK
-    magnitude = masked & 0x1F
-    return -magnitude if (masked & 0x80) else magnitude
+    """Interpret byte as two's complement signed, clamped to [-31, +31]."""
+    val = raw if raw < 128 else raw - 256
+    return max(-MAX_OFFSET, min(MAX_OFFSET, val))
 
 
 def decode_instruction(mem: bytes, ip: int) -> Optional[Tuple[str, List[int], int]]:
