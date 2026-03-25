@@ -212,6 +212,19 @@ def hamming_matrix(genomes: np.ndarray) -> np.ndarray:
         return dist
 
 
+def cluster_order(dist: np.ndarray) -> np.ndarray:
+    """Return a permutation of [0, N) that groups related genomes together."""
+    try:
+        from scipy.cluster.hierarchy import linkage, leaves_list
+        from scipy.spatial.distance import squareform
+        Z = linkage(squareform(dist.astype(np.float64)), method="ward")
+        return leaves_list(Z)
+    except ImportError:
+        print("[INFO] scipy not available — skipping clustering reorder",
+              file=sys.stderr)
+        return np.arange(len(dist))
+
+
 def make_palette(n: int) -> list:
     base = (
         [plt.get_cmap("tab20")(i) for i in range(20)]
@@ -789,6 +802,124 @@ def _draw_body_plan_thumbnail(ax, layout, plan):
     ax.invert_yaxis()
 
 
+def _generate_genome_heatmaps(output_dir: str, max_plants: int = 400,
+                              seed: int = 0, dpi: int = 150):
+    """Generate per-snapshot genome-difference heatmaps (same method as
+    plot_genome_heatmap.py).  Saves raw heatmap PNGs into images/heatmaps/.
+    """
+    import matplotlib.ticker as ticker
+
+    manifest_path = os.path.join(output_dir, "sim_manifest.json")
+    if not os.path.exists(manifest_path):
+        print("[WARN] sim_manifest.json not found — skipping heatmaps.",
+              file=sys.stderr)
+        return
+
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+
+    sim_dir = os.path.join(output_dir, "sims")
+    heatmap_dir = os.path.join(output_dir, "images", "heatmaps")
+    os.makedirs(heatmap_dir, exist_ok=True)
+
+    for sim_name in manifest["sims"]:
+        sd = os.path.join(sim_dir, sim_name)
+        genomes_path = os.path.join(sd, "genomes.parquet")
+        if not os.path.exists(genomes_path):
+            continue
+
+        table = pq.read_table(genomes_path)
+        plant_ids = table["plant_id"].to_pylist()
+        ticks_born = table["tick_born"].to_pylist()
+        raw_genomes = table["genome"]
+
+        if len(plant_ids) < 2:
+            continue
+
+        # Load start tick from metadata
+        meta_path = os.path.join(sd, "sim_metadata.json")
+        start_tick = 0
+        if os.path.exists(meta_path):
+            with open(meta_path) as f:
+                meta = json.load(f)
+            start_tick = meta.get("start_tick", 0)
+
+        # Subsample if needed
+        indices = list(range(len(plant_ids)))
+        if len(indices) > max_plants:
+            rng = np.random.default_rng(seed)
+            indices = sorted(
+                rng.choice(indices, size=max_plants, replace=False).tolist())
+
+        sel_ids = [plant_ids[i] for i in indices]
+        sel_ticks = [ticks_born[i] for i in indices]
+        genomes = np.array(
+            [np.frombuffer(raw_genomes[i].as_py(), dtype=np.uint8)
+             for i in indices],
+            dtype=np.uint8,
+        )
+
+        N = len(sel_ids)
+        genome_len = genomes.shape[1]
+
+        # Pairwise Hamming distance
+        dist = hamming_matrix(genomes)
+
+        # Hierarchical clustering reorder
+        if N > 2:
+            order = cluster_order(dist)
+            dist = dist[np.ix_(order, order)]
+            sel_ids = [sel_ids[i] for i in order]
+            sel_ticks = [sel_ticks[i] for i in order]
+
+        # Plot
+        fig_size = max(8, min(20, N / 12))
+        fig, ax = plt.subplots(figsize=(fig_size, fig_size))
+
+        im = ax.imshow(dist, cmap="inferno", interpolation="nearest",
+                        vmin=0, vmax=genome_len)
+
+        if N <= 60:
+            ax.set_xticks(range(N))
+            ax.set_yticks(range(N))
+            ax.set_xticklabels([str(p) for p in sel_ids],
+                               rotation=90, fontsize=max(4, 8 - N // 20))
+            ax.set_yticklabels([str(p) for p in sel_ids],
+                               fontsize=max(4, 8 - N // 20))
+        else:
+            k = max(1, N // 30)
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(k))
+            ax.yaxis.set_major_locator(ticker.MultipleLocator(k))
+            ax.xaxis.set_major_formatter(
+                ticker.FuncFormatter(lambda x, _: str(sel_ids[int(x)])
+                                     if 0 <= int(x) < N else ""))
+            ax.yaxis.set_major_formatter(
+                ticker.FuncFormatter(lambda y, _: str(sel_ids[int(y)])
+                                     if 0 <= int(y) < N else ""))
+            plt.setp(ax.get_xticklabels(), rotation=90, fontsize=6)
+            plt.setp(ax.get_yticklabels(), fontsize=6)
+
+        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label("Bytes different", fontsize=10)
+
+        ax.set_title(
+            f"Pairwise genome difference — {N} plants (clustered)\n"
+            f"Snapshot t={start_tick:,}  |  Bright = more different  (max {genome_len})",
+            fontsize=11,
+        )
+        ax.set_xlabel("Plant ID", fontsize=9)
+        ax.set_ylabel("Plant ID", fontsize=9)
+
+        plt.tight_layout()
+
+        out_path = os.path.join(heatmap_dir, f"heatmap_{sim_name}.png")
+        fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+
+    n_saved = len([f for f in os.listdir(heatmap_dir) if f.endswith(".png")])
+    print(f"  {n_saved} genome heatmaps saved to {heatmap_dir}/")
+
+
 def stage_plot(output_dir: str, dpi: int = 150):
     """Render the tree of life diagram."""
     links_path = os.path.join(output_dir, "links.json")
@@ -944,6 +1075,9 @@ def stage_plot(output_dir: str, dpi: int = 150):
 
     # Also generate per-species detail cards
     _generate_species_cards(nodes, img_dir, dpi)
+
+    # Generate per-snapshot genome heatmaps
+    _generate_genome_heatmaps(output_dir, dpi=dpi)
 
     return out_path
 
