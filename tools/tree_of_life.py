@@ -1025,17 +1025,87 @@ def stage_plot(output_dir: str, dpi: int = 150, max_workers: int = 4):
     for gid, snap_idx, cluster, snap in nodes:
         snap_groups.setdefault(snap_idx, []).append((gid, cluster, snap))
 
-    # Assign x positions: spread species evenly within each snapshot row
-    node_positions = {}  # global_id -> (x, y)
+    # Build adjacency from links for ordering
+    # neighbors_above[gid] = list of gids in the previous snapshot row
+    # neighbors_below[gid] = list of gids in the next snapshot row
+    neighbors_above: dict[int, list[int]] = {}
+    neighbors_below: dict[int, list[int]] = {}
+    for link in links:
+        a, b = link["from_global_id"], link["to_global_id"]
+        neighbors_below.setdefault(a, []).append(b)
+        neighbors_above.setdefault(b, []).append(a)
+
+    # Initial ordering: just the order they appear in snap_groups
+    snap_order: dict[int, list[int]] = {}  # snap_idx -> [gid, ...]
+    sorted_snaps = sorted(snap_groups.keys())
+    for snap_idx in sorted_snaps:
+        snap_order[snap_idx] = [gid for gid, _c, _s in snap_groups[snap_idx]]
+
+    def _assign_positions(snap_order):
+        """Convert ordering lists to (x, y) positions."""
+        positions = {}
+        for snap_idx, gids in snap_order.items():
+            n = len(gids)
+            for i, gid in enumerate(gids):
+                positions[gid] = ((i + 0.5) / max(n, 1) * max_species_in_row,
+                                  snap_idx)
+        return positions
+
+    def _count_crossings(snap_order, links):
+        """Count edge crossings between all adjacent layer pairs."""
+        positions = _assign_positions(snap_order)
+        crossings = 0
+        for si in range(len(sorted_snaps) - 1):
+            sa, sb = sorted_snaps[si], sorted_snaps[si + 1]
+            # Collect edges between these two layers as (xa, xb) pairs
+            edges = []
+            for link in links:
+                a, b = link["from_global_id"], link["to_global_id"]
+                if a in positions and b in positions:
+                    ya, yb = positions[a][1], positions[b][1]
+                    if (ya == sa and yb == sb):
+                        edges.append((positions[a][0], positions[b][0]))
+                    elif (ya == sb and yb == sa):
+                        edges.append((positions[b][0], positions[a][0]))
+            # Count crossings: two edges (a1,b1) and (a2,b2) cross iff
+            # (a1 < a2) != (b1 < b2)
+            for i in range(len(edges)):
+                for j in range(i + 1, len(edges)):
+                    if (edges[i][0] < edges[j][0]) != (edges[i][1] < edges[j][1]):
+                        crossings += 1
+        return crossings
+
+    # Barycenter heuristic: sweep down then up, multiple passes
     max_species_in_row = max(len(v) for v in snap_groups.values()) if snap_groups else 1
 
-    for snap_idx in sorted(snap_groups.keys()):
-        species = snap_groups[snap_idx]
-        n_species = len(species)
-        for i, (gid, cluster, snap) in enumerate(species):
-            x = (i + 0.5) / max(n_species, 1) * max_species_in_row
-            y = snap_idx  # bottom = 0, higher = later time
-            node_positions[gid] = (x, y)
+    def _reorder_layer(snap_idx, neighbor_map, ref_positions):
+        """Reorder a layer by barycenter of its neighbors' x-positions."""
+        gids = snap_order[snap_idx]
+        barycenters = {}
+        for gid in gids:
+            nbrs = neighbor_map.get(gid, [])
+            xs = [ref_positions[n][0] for n in nbrs if n in ref_positions]
+            barycenters[gid] = sum(xs) / len(xs) if xs else float('inf')
+        # Sort by barycenter; nodes with no neighbors keep relative order
+        has_bc = [(gid, barycenters[gid]) for gid in gids
+                  if barycenters[gid] != float('inf')]
+        no_bc = [gid for gid in gids if barycenters[gid] == float('inf')]
+        has_bc.sort(key=lambda t: t[1])
+        snap_order[snap_idx] = [gid for gid, _ in has_bc] + no_bc
+
+    for _pass in range(4):
+        positions = _assign_positions(snap_order)
+        # Sweep downward: reorder each layer based on parents above
+        for si in range(1, len(sorted_snaps)):
+            _reorder_layer(sorted_snaps[si], neighbors_above, positions)
+            positions = _assign_positions(snap_order)
+        # Sweep upward: reorder each layer based on children below
+        for si in range(len(sorted_snaps) - 2, -1, -1):
+            _reorder_layer(sorted_snaps[si], neighbors_below, positions)
+            positions = _assign_positions(snap_order)
+
+    # Assign final positions
+    node_positions = _assign_positions(snap_order)
 
     # Figure dimensions
     fig_width = max(12, max_species_in_row * 2.5)
@@ -1060,21 +1130,13 @@ def stage_plot(output_dir: str, dpi: int = 150, max_workers: int = 4):
 
     # Draw species nodes with inset body plan thumbnails
     node_size_inches = 1.2  # size of each body plan thumbnail
-    # We'll use fig.transFigure to position inset axes
 
-    # Get axis transform to figure coords
     palette = make_palette(len(nodes))
 
     for idx, (gid, snap_idx, cluster, snap) in enumerate(nodes):
         x, y = node_positions[gid]
-
-        # Draw node background circle/box
         color = palette[idx % len(palette)]
-
-        # Species info text
         size = cluster.get("size", 0)
-        bp_key = cluster.get("body_plan_key", "?")
-        mean_ls = cluster.get("mean_lifespan", 0)
 
         # Draw a colored marker for the node
         ax_main.scatter([x], [y], s=300, c=[color], zorder=3,
@@ -1085,32 +1147,6 @@ def stage_plot(output_dir: str, dpi: int = 150, max_workers: int = 4):
         ax_main.annotate(label, (x, y), textcoords="offset points",
                          xytext=(0, -18), ha="center", fontsize=6,
                          color="white", zorder=4)
-
-    # Create inset axes for body plans
-    # We need to convert data coords to figure coords for inset placement
-    for idx, (gid, snap_idx, cluster, snap) in enumerate(nodes):
-        x_data, y_data = node_positions[gid]
-        layout = cluster.get("body_layout", [])
-        plan = cluster.get("body_plan", {})
-
-        if not layout and not plan:
-            continue
-
-        # Convert data coordinates to display coordinates, then to figure fraction
-        display_coords = ax_main.transData.transform((x_data, y_data))
-        fig_coords = fig.transFigure.inverted().transform(display_coords)
-
-        # Inset size in figure fraction
-        inset_w = node_size_inches / fig_width
-        inset_h = node_size_inches / fig_height
-
-        inset_ax = fig.add_axes([
-            fig_coords[0] - inset_w / 2,
-            fig_coords[1] - inset_h / 2,
-            inset_w, inset_h,
-        ], zorder=5)
-
-        _draw_body_plan_thumbnail(inset_ax, layout, plan)
 
     # Y-axis: time labels (tick numbers from snapshots)
     y_ticks = []
@@ -1139,6 +1175,33 @@ def stage_plot(output_dir: str, dpi: int = 150, max_workers: int = 4):
                  ha="center", fontsize=9, color="gray")
 
     plt.tight_layout()
+
+    # Finalize layout so data→figure coordinate transforms are accurate,
+    # then place inset body plan thumbnails at each node position.
+    fig.canvas.draw()
+
+    for idx, (gid, snap_idx, cluster, snap) in enumerate(nodes):
+        x_data, y_data = node_positions[gid]
+        layout = cluster.get("body_layout", [])
+        plan = cluster.get("body_plan", {})
+
+        if not layout and not plan:
+            continue
+
+        # Convert data coordinates to figure fraction (layout is now frozen)
+        display_coords = ax_main.transData.transform((x_data, y_data))
+        fig_coords = fig.transFigure.inverted().transform(display_coords)
+
+        inset_w = node_size_inches / fig_width
+        inset_h = node_size_inches / fig_height
+
+        inset_ax = fig.add_axes([
+            fig_coords[0] - inset_w / 2,
+            fig_coords[1] - inset_h / 2,
+            inset_w, inset_h,
+        ], zorder=5)
+
+        _draw_body_plan_thumbnail(inset_ax, layout, plan)
 
     img_dir = os.path.join(output_dir, "images")
     os.makedirs(img_dir, exist_ok=True)
