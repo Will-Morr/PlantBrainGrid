@@ -627,8 +627,9 @@ def _cluster_one_sim(sim_dir: str, eps: int, min_samples: int,
 
 
 def stage_cluster(output_dir: str, eps: int, min_samples: int,
-                  max_plants: int, seed: int) -> list[dict]:
-    """Cluster genomes in each simulation directory."""
+                  max_plants: int, seed: int,
+                  max_workers: int = 4) -> list[dict]:
+    """Cluster genomes in each simulation directory (parallel)."""
     manifest_path = os.path.join(output_dir, "sim_manifest.json")
     if not os.path.exists(manifest_path):
         print("[ERR] sim_manifest.json not found. Run --simulate first.", file=sys.stderr)
@@ -644,12 +645,30 @@ def stage_cluster(output_dir: str, eps: int, min_samples: int,
             return json.load(f)
 
     sim_dir = os.path.join(output_dir, "sims")
-    all_clusters = []
-    for i, sim_name in enumerate(manifest["sims"]):
-        sd = os.path.join(sim_dir, sim_name)
-        print(f"  [{i+1}/{len(manifest['sims'])}] Clustering {sim_name}...")
-        result = _cluster_one_sim(sd, eps, min_samples, max_plants, seed)
-        all_clusters.append(result)
+    sim_names = manifest["sims"]
+    sim_dirs = [os.path.join(sim_dir, sn) for sn in sim_names]
+    n = len(sim_dirs)
+
+    print(f"  Clustering {n} snapshots with {max_workers} workers...")
+    t0 = time.monotonic()
+    # Submit all jobs, keyed by index to preserve ordering
+    all_clusters = [None] * n
+    with ProcessPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_cluster_one_sim, sd, eps, min_samples, max_plants, seed): idx
+            for idx, sd in enumerate(sim_dirs)
+        }
+        for i, future in enumerate(as_completed(futures)):
+            idx = futures[future]
+            try:
+                all_clusters[idx] = future.result()
+                elapsed = time.monotonic() - t0
+                print(f"    [{i+1}/{n}] {sim_names[idx]} done  ({elapsed:.1f}s)")
+            except Exception as e:
+                print(f"    [{i+1}/{n}] {sim_names[idx]} FAILED: {e}")
+                all_clusters[idx] = {"n_clusters": 0, "clusters": [],
+                                     "n_plants": 0, "sim_dir": sim_names[idx],
+                                     "start_tick": 0, "n_noise": 0}
 
     with open(cache_path, "w") as f:
         json.dump(all_clusters, f)
@@ -661,8 +680,72 @@ def stage_cluster(output_dir: str, eps: int, min_samples: int,
 # Stage 3: Link — connect species across adjacent snapshots
 # ---------------------------------------------------------------------------
 
-def stage_link(output_dir: str, link_eps: int) -> list[dict]:
-    """Link species across adjacent snapshots by genome similarity."""
+def _link_one_pair(snap_a: dict, snap_b: dict, pair_idx: int,
+                   link_eps: int) -> list[dict]:
+    """Link species between two adjacent snapshots. Returns list of links."""
+    clusters_a = snap_a.get("clusters", [])
+    clusters_b = snap_b.get("clusters", [])
+
+    if not clusters_a or not clusters_b:
+        return []
+
+    links = []
+
+    # Forward: best match in B for each species in A
+    for ia, ca in enumerate(clusters_a):
+        ga = np.array(ca["centroid"], dtype=np.uint8)
+        best_dist = float('inf')
+        best_ib = -1
+        for ib, cb in enumerate(clusters_b):
+            gb = np.array(cb["centroid"], dtype=np.uint8)
+            d = int(np.sum(ga != gb))
+            if d < best_dist:
+                best_dist = d
+                best_ib = ib
+
+        if best_dist <= link_eps and best_ib >= 0:
+            links.append({
+                "from_global_id": ca["global_id"],
+                "to_global_id": clusters_b[best_ib]["global_id"],
+                "distance": best_dist,
+                "from_snap": pair_idx,
+                "to_snap": pair_idx + 1,
+                "from_cluster": ia,
+                "to_cluster": best_ib,
+            })
+
+    # Reverse: species in B not yet linked
+    linked_b = {l["to_global_id"] for l in links}
+    for ib, cb in enumerate(clusters_b):
+        if cb["global_id"] in linked_b:
+            continue
+        gb = np.array(cb["centroid"], dtype=np.uint8)
+        best_dist = float('inf')
+        best_ia = -1
+        for ia, ca in enumerate(clusters_a):
+            ga = np.array(ca["centroid"], dtype=np.uint8)
+            d = int(np.sum(ga != gb))
+            if d < best_dist:
+                best_dist = d
+                best_ia = ia
+
+        if best_dist <= link_eps and best_ia >= 0:
+            links.append({
+                "from_global_id": clusters_a[best_ia]["global_id"],
+                "to_global_id": cb["global_id"],
+                "distance": best_dist,
+                "from_snap": pair_idx,
+                "to_snap": pair_idx + 1,
+                "from_cluster": best_ia,
+                "to_cluster": ib,
+            })
+
+    return links
+
+
+def stage_link(output_dir: str, link_eps: int,
+               max_workers: int = 4) -> list[dict]:
+    """Link species across adjacent snapshots by genome similarity (parallel)."""
     cache_path = os.path.join(output_dir, "links.json")
     if os.path.exists(cache_path):
         print(f"  Link cache found: {cache_path}")
@@ -677,80 +760,46 @@ def stage_link(output_dir: str, link_eps: int) -> list[dict]:
     with open(clusters_path) as f:
         all_clusters = json.load(f)
 
-    # Assign global IDs to each species
+    # Assign global IDs to each species (must be sequential)
     global_id = 0
     for snap in all_clusters:
         for cluster in snap.get("clusters", []):
             cluster["global_id"] = global_id
             global_id += 1
 
-    # Link adjacent snapshots
-    links = []
-    for i in range(len(all_clusters) - 1):
-        snap_a = all_clusters[i]
-        snap_b = all_clusters[i + 1]
-        clusters_a = snap_a.get("clusters", [])
-        clusters_b = snap_b.get("clusters", [])
+    # Link adjacent pairs in parallel
+    n_pairs = len(all_clusters) - 1
+    if n_pairs <= 0:
+        result = {"all_clusters": all_clusters, "links": []}
+        with open(cache_path, "w") as f:
+            json.dump(result, f)
+        print("  0 links (only one snapshot)")
+        return result
 
-        if not clusters_a or not clusters_b:
-            continue
+    print(f"  Linking {n_pairs} adjacent pairs with {max_workers} workers...")
+    t0 = time.monotonic()
+    all_links = []
+    with ProcessPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_link_one_pair, all_clusters[i], all_clusters[i + 1],
+                        i, link_eps): i
+            for i in range(n_pairs)
+        }
+        for future in as_completed(futures):
+            pair_idx = futures[future]
+            try:
+                pair_links = future.result()
+                all_links.extend(pair_links)
+            except Exception as e:
+                print(f"    Pair {pair_idx}→{pair_idx+1} FAILED: {e}")
 
-        # Compute pairwise distances between centroids
-        centroids_a = np.array([c["centroid"] for c in clusters_a], dtype=np.uint8)
-        centroids_b = np.array([c["centroid"] for c in clusters_b], dtype=np.uint8)
-
-        for ia, ca in enumerate(clusters_a):
-            ga = np.array(ca["centroid"], dtype=np.uint8)
-            best_dist = float('inf')
-            best_ib = -1
-            for ib, cb in enumerate(clusters_b):
-                gb = np.array(cb["centroid"], dtype=np.uint8)
-                d = int(np.sum(ga != gb))
-                if d < best_dist:
-                    best_dist = d
-                    best_ib = ib
-
-            if best_dist <= link_eps and best_ib >= 0:
-                links.append({
-                    "from_global_id": ca["global_id"],
-                    "to_global_id": clusters_b[best_ib]["global_id"],
-                    "distance": best_dist,
-                    "from_snap": i,
-                    "to_snap": i + 1,
-                    "from_cluster": ia,
-                    "to_cluster": best_ib,
-                })
-
-        # Also check reverse: species in B that aren't already linked
-        linked_b = {l["to_global_id"] for l in links if l["to_snap"] == i + 1}
-        for ib, cb in enumerate(clusters_b):
-            if cb["global_id"] in linked_b:
-                continue
-            gb = np.array(cb["centroid"], dtype=np.uint8)
-            best_dist = float('inf')
-            best_ia = -1
-            for ia, ca in enumerate(clusters_a):
-                ga = np.array(ca["centroid"], dtype=np.uint8)
-                d = int(np.sum(ga != gb))
-                if d < best_dist:
-                    best_dist = d
-                    best_ia = ia
-
-            if best_dist <= link_eps and best_ia >= 0:
-                links.append({
-                    "from_global_id": clusters_a[best_ia]["global_id"],
-                    "to_global_id": cb["global_id"],
-                    "distance": best_dist,
-                    "from_snap": i,
-                    "to_snap": i + 1,
-                    "from_cluster": best_ia,
-                    "to_cluster": ib,
-                })
+    elapsed = time.monotonic() - t0
+    print(f"    {n_pairs} pairs linked in {elapsed:.1f}s")
 
     # Deduplicate links
     seen = set()
     deduped = []
-    for l in links:
+    for l in all_links:
         key = (l["from_global_id"], l["to_global_id"])
         if key not in seen:
             seen.add(key)
@@ -802,13 +851,113 @@ def _draw_body_plan_thumbnail(ax, layout, plan):
     ax.invert_yaxis()
 
 
-def _generate_genome_heatmaps(output_dir: str, max_plants: int = 400,
-                              seed: int = 0, dpi: int = 150):
-    """Generate per-snapshot genome-difference heatmaps (same method as
-    plot_genome_heatmap.py).  Saves raw heatmap PNGs into images/heatmaps/.
-    """
-    import matplotlib.ticker as ticker
+def _generate_one_heatmap(sim_dir: str, sim_name: str, heatmap_dir: str,
+                          max_plants: int, seed: int, dpi: int) -> bool:
+    """Generate a single genome-difference heatmap. Returns True on success.
 
+    Runs in a subprocess via ProcessPoolExecutor, so imports matplotlib fresh.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as ticker
+    plt.style.use("dark_background")
+
+    genomes_path = os.path.join(sim_dir, "genomes.parquet")
+    if not os.path.exists(genomes_path):
+        return False
+
+    table = pq.read_table(genomes_path)
+    plant_ids = table["plant_id"].to_pylist()
+    raw_genomes = table["genome"]
+
+    if len(plant_ids) < 2:
+        return False
+
+    # Load start tick from metadata
+    meta_path = os.path.join(sim_dir, "sim_metadata.json")
+    start_tick = 0
+    if os.path.exists(meta_path):
+        with open(meta_path) as f:
+            meta = json.load(f)
+        start_tick = meta.get("start_tick", 0)
+
+    # Subsample if needed
+    indices = list(range(len(plant_ids)))
+    if len(indices) > max_plants:
+        rng = np.random.default_rng(seed)
+        indices = sorted(
+            rng.choice(indices, size=max_plants, replace=False).tolist())
+
+    sel_ids = [plant_ids[i] for i in indices]
+    genomes = np.array(
+        [np.frombuffer(raw_genomes[i].as_py(), dtype=np.uint8)
+         for i in indices],
+        dtype=np.uint8,
+    )
+
+    N = len(sel_ids)
+    genome_len = genomes.shape[1]
+
+    # Pairwise Hamming distance
+    dist = hamming_matrix(genomes)
+
+    # Hierarchical clustering reorder
+    if N > 2:
+        order = cluster_order(dist)
+        dist = dist[np.ix_(order, order)]
+        sel_ids = [sel_ids[i] for i in order]
+
+    # Plot
+    fig_size = max(8, min(20, N / 12))
+    fig, ax = plt.subplots(figsize=(fig_size, fig_size))
+
+    im = ax.imshow(dist, cmap="inferno", interpolation="nearest",
+                    vmin=0, vmax=genome_len)
+
+    if N <= 60:
+        ax.set_xticks(range(N))
+        ax.set_yticks(range(N))
+        ax.set_xticklabels([str(p) for p in sel_ids],
+                           rotation=90, fontsize=max(4, 8 - N // 20))
+        ax.set_yticklabels([str(p) for p in sel_ids],
+                           fontsize=max(4, 8 - N // 20))
+    else:
+        k = max(1, N // 30)
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(k))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(k))
+        ax.xaxis.set_major_formatter(
+            ticker.FuncFormatter(lambda x, _: str(sel_ids[int(x)])
+                                 if 0 <= int(x) < N else ""))
+        ax.yaxis.set_major_formatter(
+            ticker.FuncFormatter(lambda y, _: str(sel_ids[int(y)])
+                                 if 0 <= int(y) < N else ""))
+        plt.setp(ax.get_xticklabels(), rotation=90, fontsize=6)
+        plt.setp(ax.get_yticklabels(), fontsize=6)
+
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label("Bytes different", fontsize=10)
+
+    ax.set_title(
+        f"Pairwise genome difference — {N} plants (clustered)\n"
+        f"Snapshot t={start_tick:,}  |  Bright = more different  (max {genome_len})",
+        fontsize=11,
+    )
+    ax.set_xlabel("Plant ID", fontsize=9)
+    ax.set_ylabel("Plant ID", fontsize=9)
+
+    plt.tight_layout()
+
+    out_path = os.path.join(heatmap_dir, f"heatmap_{sim_name}.png")
+    fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+    return True
+
+
+def _generate_genome_heatmaps(output_dir: str, max_plants: int = 400,
+                              seed: int = 0, dpi: int = 150,
+                              max_workers: int = 4):
+    """Generate per-snapshot genome-difference heatmaps (parallel)."""
     manifest_path = os.path.join(output_dir, "sim_manifest.json")
     if not os.path.exists(manifest_path):
         print("[WARN] sim_manifest.json not found — skipping heatmaps.",
@@ -818,109 +967,34 @@ def _generate_genome_heatmaps(output_dir: str, max_plants: int = 400,
     with open(manifest_path) as f:
         manifest = json.load(f)
 
-    sim_dir = os.path.join(output_dir, "sims")
+    sims_dir = os.path.join(output_dir, "sims")
     heatmap_dir = os.path.join(output_dir, "images", "heatmaps")
     os.makedirs(heatmap_dir, exist_ok=True)
 
-    for sim_name in manifest["sims"]:
-        sd = os.path.join(sim_dir, sim_name)
-        genomes_path = os.path.join(sd, "genomes.parquet")
-        if not os.path.exists(genomes_path):
-            continue
+    sim_names = manifest["sims"]
+    print(f"  Generating {len(sim_names)} heatmaps with {max_workers} workers...")
+    t0 = time.monotonic()
+    n_ok = 0
+    with ProcessPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_generate_one_heatmap,
+                        os.path.join(sims_dir, sn), sn, heatmap_dir,
+                        max_plants, seed, dpi): sn
+            for sn in sim_names
+        }
+        for future in as_completed(futures):
+            sn = futures[future]
+            try:
+                if future.result():
+                    n_ok += 1
+            except Exception as e:
+                print(f"    Heatmap {sn} FAILED: {e}")
 
-        table = pq.read_table(genomes_path)
-        plant_ids = table["plant_id"].to_pylist()
-        ticks_born = table["tick_born"].to_pylist()
-        raw_genomes = table["genome"]
-
-        if len(plant_ids) < 2:
-            continue
-
-        # Load start tick from metadata
-        meta_path = os.path.join(sd, "sim_metadata.json")
-        start_tick = 0
-        if os.path.exists(meta_path):
-            with open(meta_path) as f:
-                meta = json.load(f)
-            start_tick = meta.get("start_tick", 0)
-
-        # Subsample if needed
-        indices = list(range(len(plant_ids)))
-        if len(indices) > max_plants:
-            rng = np.random.default_rng(seed)
-            indices = sorted(
-                rng.choice(indices, size=max_plants, replace=False).tolist())
-
-        sel_ids = [plant_ids[i] for i in indices]
-        sel_ticks = [ticks_born[i] for i in indices]
-        genomes = np.array(
-            [np.frombuffer(raw_genomes[i].as_py(), dtype=np.uint8)
-             for i in indices],
-            dtype=np.uint8,
-        )
-
-        N = len(sel_ids)
-        genome_len = genomes.shape[1]
-
-        # Pairwise Hamming distance
-        dist = hamming_matrix(genomes)
-
-        # Hierarchical clustering reorder
-        if N > 2:
-            order = cluster_order(dist)
-            dist = dist[np.ix_(order, order)]
-            sel_ids = [sel_ids[i] for i in order]
-            sel_ticks = [sel_ticks[i] for i in order]
-
-        # Plot
-        fig_size = max(8, min(20, N / 12))
-        fig, ax = plt.subplots(figsize=(fig_size, fig_size))
-
-        im = ax.imshow(dist, cmap="inferno", interpolation="nearest",
-                        vmin=0, vmax=genome_len)
-
-        if N <= 60:
-            ax.set_xticks(range(N))
-            ax.set_yticks(range(N))
-            ax.set_xticklabels([str(p) for p in sel_ids],
-                               rotation=90, fontsize=max(4, 8 - N // 20))
-            ax.set_yticklabels([str(p) for p in sel_ids],
-                               fontsize=max(4, 8 - N // 20))
-        else:
-            k = max(1, N // 30)
-            ax.xaxis.set_major_locator(ticker.MultipleLocator(k))
-            ax.yaxis.set_major_locator(ticker.MultipleLocator(k))
-            ax.xaxis.set_major_formatter(
-                ticker.FuncFormatter(lambda x, _: str(sel_ids[int(x)])
-                                     if 0 <= int(x) < N else ""))
-            ax.yaxis.set_major_formatter(
-                ticker.FuncFormatter(lambda y, _: str(sel_ids[int(y)])
-                                     if 0 <= int(y) < N else ""))
-            plt.setp(ax.get_xticklabels(), rotation=90, fontsize=6)
-            plt.setp(ax.get_yticklabels(), fontsize=6)
-
-        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-        cbar.set_label("Bytes different", fontsize=10)
-
-        ax.set_title(
-            f"Pairwise genome difference — {N} plants (clustered)\n"
-            f"Snapshot t={start_tick:,}  |  Bright = more different  (max {genome_len})",
-            fontsize=11,
-        )
-        ax.set_xlabel("Plant ID", fontsize=9)
-        ax.set_ylabel("Plant ID", fontsize=9)
-
-        plt.tight_layout()
-
-        out_path = os.path.join(heatmap_dir, f"heatmap_{sim_name}.png")
-        fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
-        plt.close(fig)
-
-    n_saved = len([f for f in os.listdir(heatmap_dir) if f.endswith(".png")])
-    print(f"  {n_saved} genome heatmaps saved to {heatmap_dir}/")
+    elapsed = time.monotonic() - t0
+    print(f"  {n_ok} genome heatmaps saved to {heatmap_dir}/  ({elapsed:.1f}s)")
 
 
-def stage_plot(output_dir: str, dpi: int = 150):
+def stage_plot(output_dir: str, dpi: int = 150, max_workers: int = 4):
     """Render the tree of life diagram."""
     links_path = os.path.join(output_dir, "links.json")
     if not os.path.exists(links_path):
@@ -1074,136 +1148,174 @@ def stage_plot(output_dir: str, dpi: int = 150):
     print(f"  Tree of life saved to {out_path}")
 
     # Also generate per-species detail cards
-    _generate_species_cards(nodes, img_dir, dpi)
+    _generate_species_cards(nodes, img_dir, dpi, max_workers=max_workers)
 
     # Generate per-snapshot genome heatmaps
-    _generate_genome_heatmaps(output_dir, dpi=dpi)
+    _generate_genome_heatmaps(output_dir, dpi=dpi, max_workers=max_workers)
 
     return out_path
 
 
-def _generate_species_cards(nodes, img_dir, dpi):
-    """Generate a detail card for each species with body plan and stats."""
+def _generate_one_species_card(gid: int, snap_idx: int, cluster: dict,
+                               snap: dict, cards_dir: str, dpi: int) -> bool:
+    """Generate a single species detail card. Runs in a subprocess."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
+    from matplotlib.patches import Rectangle
+    plt.style.use("dark_background")
+
+    layout = cluster.get("body_layout", [])
+    plan = cluster.get("body_plan", {})
+
+    if not plan:
+        return False
+
+    fig = plt.figure(figsize=(8, 3.5))
+    gs = gridspec.GridSpec(1, 3, width_ratios=[2.5, 2, 2.5], wspace=0.3)
+
+    # Left: body plan grid
+    ax_grid = fig.add_subplot(gs[0])
+    cells = {(0, 0): "Primary"}
+    for name, dx, dy in layout:
+        cells[(dx, dy)] = name
+
+    all_x = [p[0] for p in cells]
+    all_y = [p[1] for p in cells]
+    min_x, max_x = min(all_x) - 1, max(all_x) + 1
+    min_y, max_y = min(all_y) - 1, max(all_y) + 1
+
+    ax_grid.set_xlim(min_x - 0.5, max_x + 0.5)
+    ax_grid.set_ylim(min_y - 0.5, max_y + 0.5)
+    ax_grid.set_aspect("equal")
+    ax_grid.set_facecolor("black")
+    ax_grid.set_title("Body Layout", fontsize=9)
+
+    for (cx, cy), name in cells.items():
+        cid_cell = CELL_NAME_TO_ID.get(name, 0)
+        r, g, b = CELL_COLORS_RGB.get(cid_cell, (255, 0, 240))
+        ax_grid.add_patch(Rectangle(
+            (cx - 0.45, cy - 0.45), 0.9, 0.9,
+            facecolor=(r / 255, g / 255, b / 255),
+            edgecolor=(0.3, 0.3, 0.3), linewidth=0.5,
+        ))
+    ax_grid.tick_params(labelsize=6)
+    ax_grid.invert_yaxis()
+
+    # Middle: cell legend + stats
+    ax_legend = fig.add_subplot(gs[1])
+    ax_legend.axis("off")
+
+    size = cluster.get("size", 0)
+    mean_ls = cluster.get("mean_lifespan", 0)
+    median_ls = cluster.get("median_lifespan", 0)
+    start_tick = snap.get("start_tick", 0)
+
+    ax_legend.text(0.0, 1.0, f"Species #{gid}", fontsize=10,
+                   color="white", fontweight="bold", va="top",
+                   transform=ax_legend.transAxes)
+    ax_legend.text(0.0, 0.90, f"Population: {size}", fontsize=8,
+                   color="white", va="top", transform=ax_legend.transAxes)
+    ax_legend.text(0.0, 0.82, f"Snapshot tick: {start_tick:,}", fontsize=8,
+                   color="white", va="top", transform=ax_legend.transAxes)
+    ax_legend.text(0.0, 0.74, f"Mean lifespan: {mean_ls:.0f}", fontsize=8,
+                   color="white", va="top", transform=ax_legend.transAxes)
+    ax_legend.text(0.0, 0.66, f"Median lifespan: {median_ls:.0f}", fontsize=8,
+                   color="white", va="top", transform=ax_legend.transAxes)
+
+    sorted_cells = sorted(plan.items(), key=lambda x: -x[1])
+    sorted_cells.insert(0, ("Primary", 1))
+    y_pos = 0.54
+    for name, cnt in sorted_cells:
+        cid_cell = CELL_NAME_TO_ID.get(name, 0)
+        r, g, b = CELL_COLORS_RGB.get(cid_cell, (255, 0, 240))
+        color = (r / 255, g / 255, b / 255)
+        ax_legend.add_patch(Rectangle(
+            (0.0, y_pos - 0.03), 0.06, 0.04,
+            facecolor=color, edgecolor="white", linewidth=0.5,
+            transform=ax_legend.transAxes, clip_on=False,
+        ))
+        ax_legend.text(0.09, y_pos - 0.01, f"{cnt}x {name}",
+                       fontsize=7, color="white", va="center",
+                       transform=ax_legend.transAxes)
+        y_pos -= 0.065
+
+    # Right: cost table
+    ax_table = fig.add_subplot(gs[2])
+    ax_table.axis("off")
+
+    total_build, total_income, total_maint = _compute_body_costs(plan)
+
+    def fmt(v):
+        return f"{v:.2f}" if v != 0 else "—"
+
+    table_data = [
+        ["Energy",    fmt(total_build[0]), fmt(total_income[0]), fmt(total_maint[0])],
+        ["Water",     fmt(total_build[1]), fmt(total_income[1]), fmt(total_maint[1])],
+        ["Nutrients", fmt(total_build[2]), fmt(total_income[2]), fmt(total_maint[2])],
+    ]
+    col_labels = ["", "Build", "Income/t", "Maint/t"]
+
+    tbl = ax_table.table(
+        cellText=table_data, colLabels=col_labels,
+        loc="upper center", cellLoc="center",
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(7)
+    tbl.scale(1.0, 1.3)
+    for (row, col), cell in tbl.get_celld().items():
+        cell.set_edgecolor("gray")
+        cell.set_text_props(color="white")
+        if row == 0:
+            cell.set_facecolor("#333333")
+        else:
+            cell.set_facecolor("#1a1a1a")
+    ax_table.set_title("Resource Costs", fontsize=9, pad=8)
+
+    bp_key = cluster.get("body_plan_key", "")
+    fig.suptitle(bp_key, fontsize=8, y=1.01)
+    plt.tight_layout()
+
+    card_path = os.path.join(cards_dir, f"species_{gid:04d}.png")
+    fig.savefig(card_path, dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+    return True
+
+
+def _generate_species_cards(nodes, img_dir, dpi, max_workers=4):
+    """Generate a detail card for each species with body plan and stats (parallel)."""
     cards_dir = os.path.join(img_dir, "species_cards")
     os.makedirs(cards_dir, exist_ok=True)
 
-    for gid, snap_idx, cluster, snap in nodes:
-        layout = cluster.get("body_layout", [])
-        plan = cluster.get("body_plan", {})
+    # Filter to nodes that have a body plan
+    jobs = [(gid, snap_idx, cluster, snap)
+            for gid, snap_idx, cluster, snap in nodes
+            if cluster.get("body_plan")]
 
-        if not plan:
-            continue
+    if not jobs:
+        print("  No species cards to generate.")
+        return
 
-        fig = plt.figure(figsize=(8, 3.5))
-        gs = gridspec.GridSpec(1, 3, width_ratios=[2.5, 2, 2.5], wspace=0.3)
+    print(f"  Generating {len(jobs)} species cards with {max_workers} workers...")
+    t0 = time.monotonic()
+    n_ok = 0
+    with ProcessPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_generate_one_species_card,
+                        gid, snap_idx, cluster, snap, cards_dir, dpi): gid
+            for gid, snap_idx, cluster, snap in jobs
+        }
+        for future in as_completed(futures):
+            gid = futures[future]
+            try:
+                if future.result():
+                    n_ok += 1
+            except Exception as e:
+                print(f"    Species card #{gid} FAILED: {e}")
 
-        # Left: body plan grid
-        ax_grid = fig.add_subplot(gs[0])
-        cells = {(0, 0): "Primary"}
-        for name, dx, dy in layout:
-            cells[(dx, dy)] = name
-
-        all_x = [p[0] for p in cells]
-        all_y = [p[1] for p in cells]
-        min_x, max_x = min(all_x) - 1, max(all_x) + 1
-        min_y, max_y = min(all_y) - 1, max(all_y) + 1
-
-        ax_grid.set_xlim(min_x - 0.5, max_x + 0.5)
-        ax_grid.set_ylim(min_y - 0.5, max_y + 0.5)
-        ax_grid.set_aspect("equal")
-        ax_grid.set_facecolor("black")
-        ax_grid.set_title("Body Layout", fontsize=9)
-
-        for (cx, cy), name in cells.items():
-            cid_cell = CELL_NAME_TO_ID.get(name, 0)
-            r, g, b = CELL_COLORS_RGB.get(cid_cell, (255, 0, 240))
-            ax_grid.add_patch(Rectangle(
-                (cx - 0.45, cy - 0.45), 0.9, 0.9,
-                facecolor=(r / 255, g / 255, b / 255),
-                edgecolor=(0.3, 0.3, 0.3), linewidth=0.5,
-            ))
-        ax_grid.tick_params(labelsize=6)
-        ax_grid.invert_yaxis()
-
-        # Middle: cell legend + stats
-        ax_legend = fig.add_subplot(gs[1])
-        ax_legend.axis("off")
-
-        size = cluster.get("size", 0)
-        mean_ls = cluster.get("mean_lifespan", 0)
-        median_ls = cluster.get("median_lifespan", 0)
-        start_tick = snap.get("start_tick", 0)
-
-        ax_legend.text(0.0, 1.0, f"Species #{gid}", fontsize=10,
-                       color="white", fontweight="bold", va="top",
-                       transform=ax_legend.transAxes)
-        ax_legend.text(0.0, 0.90, f"Population: {size}", fontsize=8,
-                       color="white", va="top", transform=ax_legend.transAxes)
-        ax_legend.text(0.0, 0.82, f"Snapshot tick: {start_tick:,}", fontsize=8,
-                       color="white", va="top", transform=ax_legend.transAxes)
-        ax_legend.text(0.0, 0.74, f"Mean lifespan: {mean_ls:.0f}", fontsize=8,
-                       color="white", va="top", transform=ax_legend.transAxes)
-        ax_legend.text(0.0, 0.66, f"Median lifespan: {median_ls:.0f}", fontsize=8,
-                       color="white", va="top", transform=ax_legend.transAxes)
-
-        sorted_cells = sorted(plan.items(), key=lambda x: -x[1])
-        sorted_cells.insert(0, ("Primary", 1))
-        y_pos = 0.54
-        for name, cnt in sorted_cells:
-            cid_cell = CELL_NAME_TO_ID.get(name, 0)
-            r, g, b = CELL_COLORS_RGB.get(cid_cell, (255, 0, 240))
-            color = (r / 255, g / 255, b / 255)
-            ax_legend.add_patch(Rectangle(
-                (0.0, y_pos - 0.03), 0.06, 0.04,
-                facecolor=color, edgecolor="white", linewidth=0.5,
-                transform=ax_legend.transAxes, clip_on=False,
-            ))
-            ax_legend.text(0.09, y_pos - 0.01, f"{cnt}x {name}",
-                           fontsize=7, color="white", va="center",
-                           transform=ax_legend.transAxes)
-            y_pos -= 0.065
-
-        # Right: cost table
-        ax_table = fig.add_subplot(gs[2])
-        ax_table.axis("off")
-
-        total_build, total_income, total_maint = _compute_body_costs(plan)
-
-        def fmt(v):
-            return f"{v:.2f}" if v != 0 else "—"
-
-        table_data = [
-            ["Energy",    fmt(total_build[0]), fmt(total_income[0]), fmt(total_maint[0])],
-            ["Water",     fmt(total_build[1]), fmt(total_income[1]), fmt(total_maint[1])],
-            ["Nutrients", fmt(total_build[2]), fmt(total_income[2]), fmt(total_maint[2])],
-        ]
-        col_labels = ["", "Build", "Income/t", "Maint/t"]
-
-        tbl = ax_table.table(
-            cellText=table_data, colLabels=col_labels,
-            loc="upper center", cellLoc="center",
-        )
-        tbl.auto_set_font_size(False)
-        tbl.set_fontsize(7)
-        tbl.scale(1.0, 1.3)
-        for (row, col), cell in tbl.get_celld().items():
-            cell.set_edgecolor("gray")
-            cell.set_text_props(color="white")
-            if row == 0:
-                cell.set_facecolor("#333333")
-            else:
-                cell.set_facecolor("#1a1a1a")
-        ax_table.set_title("Resource Costs", fontsize=9, pad=8)
-
-        bp_key = cluster.get("body_plan_key", "")
-        fig.suptitle(bp_key, fontsize=8, y=1.01)
-        plt.tight_layout()
-
-        card_path = os.path.join(cards_dir, f"species_{gid:04d}.png")
-        fig.savefig(card_path, dpi=dpi, bbox_inches="tight")
-        plt.close(fig)
-
-    print(f"  {len(nodes)} species cards saved to {cards_dir}/")
+    elapsed = time.monotonic() - t0
+    print(f"  {n_ok} species cards saved to {cards_dir}/  ({elapsed:.1f}s)")
 
 
 # ---------------------------------------------------------------------------
@@ -1236,7 +1348,7 @@ def main():
     parser.add_argument("--log-every", type=int, default=1,
                         help="Log plant state every N ticks")
     parser.add_argument("--workers", type=int, default=None,
-                        help="Max parallel simulation workers (default: CPU count / 2)")
+                        help="Max parallel workers for all stages (default: CPU count / 2)")
 
     # Clustering params
     parser.add_argument("--eps", type=int, default=200,
@@ -1275,15 +1387,16 @@ def main():
 
     if run_all or args.cluster:
         print(f"\n=== Stage 2: Cluster (eps={args.eps}, min_samples={args.min_samples}) ===")
-        stage_cluster(output_dir, args.eps, args.min_samples, args.max_plants, args.seed)
+        stage_cluster(output_dir, args.eps, args.min_samples, args.max_plants, args.seed,
+                      max_workers=max_workers)
 
     if run_all or args.link:
         print(f"\n=== Stage 3: Link species across snapshots (link_eps={args.link_eps}) ===")
-        stage_link(output_dir, args.link_eps)
+        stage_link(output_dir, args.link_eps, max_workers=max_workers)
 
     if run_all or args.plot:
         print(f"\n=== Stage 4: Plot tree of life ===")
-        stage_plot(output_dir, args.dpi)
+        stage_plot(output_dir, args.dpi, max_workers=max_workers)
 
     print("\nDone.")
 
