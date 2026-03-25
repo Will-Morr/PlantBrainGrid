@@ -89,9 +89,10 @@ OFFSET_MASK = 0x9F
 
 
 def _masked_offset(raw: int) -> int:
-    """Apply the offset mask and interpret as signed int8."""
+    """Apply the offset mask and interpret as sign-magnitude."""
     masked = raw & OFFSET_MASK
-    return masked if masked < 128 else masked - 256
+    magnitude = masked & 0x1F
+    return -magnitude if (masked & 0x80) else magnitude
 
 
 def decode_instruction(mem: bytes, ip: int) -> Optional[Tuple[str, List[int], int]]:
