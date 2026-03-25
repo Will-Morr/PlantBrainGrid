@@ -3,6 +3,7 @@
 #include "core/brain_ops.hpp"
 #include "core/plant.hpp"
 #include "core/world.hpp"
+#include "core/simulation.hpp"
 #include <random>
 
 using namespace pbg;
@@ -611,4 +612,57 @@ TEST_CASE("Brain conditional jumps (GT/EQ/LT)", "[brain]") {
         REQUIRE(plant.brain().is_halted());
         REQUIRE(plant.brain().ip() == P + 8);
     }
+}
+
+TEST_CASE("Place cells in all four directions", "[brain]") {
+    // Genome: place SmallLeaf at (+1,0), (-1,0), (0,+1), (0,-1), then HALT.
+    // -1 in two's complement is 0xFF.
+    std::vector<uint8_t> genome(P + 17, 0);
+    uint8_t leaf = static_cast<uint8_t>(CellType::SmallLeaf);
+
+    // Right: dx=+1, dy=0
+    genome[P]      = OP_PLACE_CELL;
+    genome[P + 1]  = leaf;
+    genome[P + 2]  = 1;
+    genome[P + 3]  = 0;
+
+    // Left: dx=-1, dy=0
+    genome[P + 4]  = OP_PLACE_CELL;
+    genome[P + 5]  = leaf;
+    genome[P + 6]  = 0xFF;  // -1
+    genome[P + 7]  = 0;
+
+    // Down: dx=0, dy=+1
+    genome[P + 8]  = OP_PLACE_CELL;
+    genome[P + 9]  = leaf;
+    genome[P + 10] = 0;
+    genome[P + 11] = 1;
+
+    // Up: dx=0, dy=-1
+    genome[P + 12] = OP_PLACE_CELL;
+    genome[P + 13] = leaf;
+    genome[P + 14] = 0;
+    genome[P + 15] = 0xFF;  // -1
+
+    genome[P + 16] = OP_HALT;
+
+    Simulation sim(100, 100, 42);
+    Plant* plant = sim.add_plant({50, 50}, genome);
+    REQUIRE(plant != nullptr);
+    plant->resources() = Resources{1000.0f, 1000.0f, 1000.0f};
+
+    // One tick runs the brain and resolves placements
+    sim.advance_tick();
+
+    // Primary cell + 4 placed cells = 5 total
+    Plant* p = sim.find_plant(plant->id());
+    REQUIRE(p != nullptr);
+    REQUIRE(p->is_alive());
+    REQUIRE(p->cell_count() == 5);
+
+    // Verify each direction has a cell
+    REQUIRE(p->find_cell({51, 50}) != nullptr);  // right
+    REQUIRE(p->find_cell({49, 50}) != nullptr);  // left
+    REQUIRE(p->find_cell({50, 51}) != nullptr);  // down
+    REQUIRE(p->find_cell({50, 49}) != nullptr);  // up
 }
